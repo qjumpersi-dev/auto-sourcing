@@ -1,0 +1,220 @@
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { ArrowLeft, Loader2, MailPlus, Send } from 'lucide-react'
+import {
+  useCreateDraftMutation,
+  useGetCampaignQuery,
+  useGetLeadsQuery,
+  useGetMessagesQuery,
+  useSendMessageMutation,
+} from '@/services/apiSlice'
+import {
+  messageStatusLabels,
+  OutreachMessageStatus,
+} from '@/types/models'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
+
+interface DraftFormValues {
+  leadId: string
+  subjectTemplate: string
+  bodyTemplate: string
+}
+
+function messageVariant(status: number) {
+  switch (status) {
+    case OutreachMessageStatus.Sent:
+      return 'success'
+    case OutreachMessageStatus.Failed:
+    case OutreachMessageStatus.Bounced:
+      return 'destructive'
+    case OutreachMessageStatus.Queued:
+      return 'warning'
+    default:
+      return 'secondary'
+  }
+}
+
+export function CampaignDetailPage({
+  campaignId,
+  onBack,
+}: {
+  campaignId: number
+  onBack: () => void
+}) {
+  const { data: campaign } = useGetCampaignQuery(campaignId)
+  const { data: messages = [] } = useGetMessagesQuery(campaignId)
+  const { data: leads = [] } = useGetLeadsQuery()
+  const [createDraft, { isLoading: creating }] = useCreateDraftMutation()
+  const [sendMessage, { isLoading: sending }] = useSendMessageMutation()
+  const [draftError, setDraftError] = useState<string | null>(null)
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<DraftFormValues>()
+
+  useEffect(() => {
+    setDraftError(null)
+  }, [campaignId])
+
+  const onSubmit = handleSubmit(async (values) => {
+    setDraftError(null)
+    try {
+      await createDraft({
+        campaignId,
+        leadId: Number(values.leadId),
+        subjectTemplate: values.subjectTemplate,
+        bodyTemplate: values.bodyTemplate,
+      }).unwrap()
+      reset()
+    } catch (e) {
+      setDraftError('Could not create the draft.')
+    }
+  })
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to campaigns">
+          <ArrowLeft />
+        </Button>
+        <div>
+          <h2 className="text-xl font-semibold">{campaign?.name ?? 'Campaign'}</h2>
+          {campaign?.description && (
+            <p className="text-sm text-muted-foreground">{campaign.description}</p>
+          )}
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Create draft</CardTitle>
+          <CardDescription>
+            Personalise with {'{{FirstName}}'}, {'{{LastName}}'}, {'{{Company}}'},{' '}
+            {'{{JobTitle}}'}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div className="space-y-1.5 max-w-sm">
+              <Label htmlFor="leadId">Lead</Label>
+              <Select {...register('leadId', { required: true })}>
+                <option value="">Select a lead…</option>
+                {leads.map((lead) => (
+                  <option key={lead.id} value={lead.id}>
+                    {lead.firstName} {lead.lastName}
+                    {lead.company ? ` - ${lead.company}` : ''}
+                  </option>
+                ))}
+              </Select>
+              {errors.leadId && <p className="text-xs text-destructive">Pick a lead.</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="subject">Subject template</Label>
+              <Input
+                id="subject"
+                placeholder="Quick question, {'{{FirstName}}'}"
+                {...register('subjectTemplate', { required: true })}
+              />
+              {errors.subjectTemplate && (
+                <p className="text-xs text-destructive">Subject is required.</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="body">Body template</Label>
+              <Textarea id="body" rows={6} {...register('bodyTemplate', { required: true })} />
+              {errors.bodyTemplate && (
+                <p className="text-xs text-destructive">Body is required.</p>
+              )}
+            </div>
+            {draftError && <p className="text-xs text-destructive">{draftError}</p>}
+            <Button type="submit" disabled={creating}>
+              {creating ? <Loader2 className="animate-spin" /> : <MailPlus />}
+              Save draft
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Messages ({messages.length})</CardTitle>
+          <CardDescription>Draft, send and track outreach per lead.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {messages.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No messages yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Lead</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Sent</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {messages.map((message) => (
+                  <TableRow key={message.id}>
+                    <TableCell className="font-medium">
+                      {message.lead
+                        ? `${message.lead.firstName} ${message.lead.lastName}`
+                        : `#${message.leadId}`}
+                      {message.errorMessage && (
+                        <span className="block text-xs text-destructive">
+                          {message.errorMessage}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>{message.subject ?? '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant={messageVariant(message.status)}>
+                        {messageStatusLabels[message.status]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {message.sentAt
+                        ? new Date(message.sentAt).toLocaleString()
+                        : '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {message.status === OutreachMessageStatus.Draft ||
+                      message.status === OutreachMessageStatus.Failed ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={sending}
+                          onClick={() =>
+                            sendMessage({ campaignId, messageId: message.id })
+                          }
+                        >
+                          {sending ? (
+                            <Loader2 className="animate-spin" />
+                          ) : (
+                            <Send />
+                          )}
+                          Send
+                        </Button>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
