@@ -29,6 +29,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AutoSourcingDbContext>();
+    db.Database.Migrate();
+}
+
 app.UseAuthorization();
 app.MapControllers();
 
