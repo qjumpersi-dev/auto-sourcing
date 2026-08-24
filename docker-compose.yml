@@ -10,6 +10,9 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=AutoSourcing;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True
+    depends_on:
+      - sqlserver
     networks:
       - autosourcing-network
 
@@ -24,6 +27,22 @@ services:
     networks:
       - autosourcing-network
 
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrong!Passw0rd
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    networks:
+      - autosourcing-network
+
 networks:
   autosourcing-network:
     driver: bridge
+
+volumes:
+  sqlserver-data:
