@@ -1,3 +1,5 @@
+using AutoSourcing.Core.Enums;
+
 namespace AutoSourcing.Core.Entities;
 
 public class Lead
