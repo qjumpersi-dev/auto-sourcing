@@ -36,7 +36,7 @@ public class LeadsController : ControllerBase
     [HttpPost("search-rhetorik")]
     public async Task<ActionResult<IReadOnlyList<Lead>>> SearchRhetorik([FromBody] RhetorikSearchRequest request, CancellationToken cancellationToken)
     {
-        var profiles = await _rhetorikClient.SearchProfilesAsync(request, cancellationToken);
+        var profiles = await _rhetorikClient.SearchContactsAsync(request, cancellationToken);
         return Ok(profiles);
     }
 

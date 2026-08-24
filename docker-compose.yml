@@ -11,6 +11,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=AutoSourcing;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True
+      - Rhetorik__ApiKey=${RHETORIK_API_KEY:-}
     depends_on:
       - sqlserver
     networks:
