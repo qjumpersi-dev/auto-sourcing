@@ -8,7 +8,6 @@ public class RhetorikSearchRequest
     public List<string>? JobTitles { get; set; }
     public List<string>? Companies { get; set; }
     public List<string>? Countries { get; set; }
-    public bool RevealAllData { get; set; } = true;
     public int PageNumber { get; set; } = 1;
     public int PageSize { get; set; } = 25;
 

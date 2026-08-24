@@ -105,7 +105,6 @@ public class RhetorikClientTests
             JobTitles = ["Head of Talent"],
             Companies = ["Acme Corp"],
             Countries = ["New Zealand"],
-            RevealAllData = true,
             PageNumber = 2,
             PageSize = 50
         });
@@ -113,7 +112,7 @@ public class RhetorikClientTests
         var body = handler.LastRequestBody;
 
         Assert.True(body.TryGetProperty("reveal_all_data", out var reveal));
-        Assert.True(reveal.GetBoolean());
+        Assert.False(reveal.GetBoolean());
         Assert.Equal(50, body.GetProperty("page_size").GetInt32());
         Assert.Equal(2, body.GetProperty("page_number").GetInt32());
 

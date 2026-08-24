@@ -9,6 +9,8 @@ public class RhetorikClient : IRhetorikClient
 {
     private const string SearchEndpoint = "contact/search";
 
+    private const bool RevealAllData = false;
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _httpClient;
@@ -27,7 +29,7 @@ public class RhetorikClient : IRhetorikClient
         var payload = new
         {
             parameters = request.BuildParameters(),
-            reveal_all_data = request.RevealAllData,
+            reveal_all_data = RevealAllData,
             page_size = request.PageSize,
             page_number = request.PageNumber
         };
