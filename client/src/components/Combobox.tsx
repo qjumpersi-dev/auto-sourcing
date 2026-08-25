@@ -11,15 +11,21 @@ export function SuggestionInput({
   className,
 }: {
   field: 'countries' | 'skill_names'
-  value: string | undefined
+  value?: string
   onChange: (value: string) => void
   placeholder?: string
   className?: string
 }) {
   const [trigger, { isFetching }] = useLazyAutocompleteQuery()
+  const [text, setText] = useState(value ?? '')
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const external = value ?? ''
+    setText((current) => (current === external ? current : external))
+  }, [value])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -32,21 +38,20 @@ export function SuggestionInput({
   }, [])
 
   useEffect(() => {
-    const text = (value ?? '').trim()
-    if (!open || text.length < 2) {
+    if (!open || text.trim().length < 2) {
       setSuggestions([])
       return
     }
     const timer = setTimeout(async () => {
       try {
-        const result = await trigger({ field, inputText: text }).unwrap()
+        const result = await trigger({ field, inputText: text.trim() }).unwrap()
         setSuggestions(result.map((s) => s.content))
       } catch {
         setSuggestions([])
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [value, open, field, trigger])
+  }, [text, open, field, trigger])
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
@@ -54,11 +59,12 @@ export function SuggestionInput({
         <input
           type="text"
           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 pr-8 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          value={value}
+          value={text}
           placeholder={placeholder}
           onChange={(e) => {
-            onChange(e.target.value)
+            setText(e.target.value)
             setOpen(true)
+            onChange(e.target.value)
           }}
           onFocus={() => setOpen(true)}
         />
@@ -74,6 +80,7 @@ export function SuggestionInput({
                 type="button"
                 className="w-full px-3 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
                 onClick={() => {
+                  setText(s)
                   onChange(s)
                   setOpen(false)
                 }}
@@ -87,4 +94,3 @@ export function SuggestionInput({
     </div>
   )
 }
-
