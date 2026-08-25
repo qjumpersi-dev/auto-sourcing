@@ -11,7 +11,7 @@ export function SuggestionInput({
   className,
 }: {
   field: 'countries' | 'skill_names'
-  value: string
+  value: string | undefined
   onChange: (value: string) => void
   placeholder?: string
   className?: string
@@ -32,13 +32,14 @@ export function SuggestionInput({
   }, [])
 
   useEffect(() => {
-    if (!open || value.trim().length < 2) {
+    const text = (value ?? '').trim()
+    if (!open || text.length < 2) {
       setSuggestions([])
       return
     }
     const timer = setTimeout(async () => {
       try {
-        const result = await trigger({ field, inputText: value.trim() }).unwrap()
+        const result = await trigger({ field, inputText: text }).unwrap()
         setSuggestions(result.map((s) => s.content))
       } catch {
         setSuggestions([])
@@ -86,3 +87,4 @@ export function SuggestionInput({
     </div>
   )
 }
+

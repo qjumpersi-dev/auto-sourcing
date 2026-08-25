@@ -58,9 +58,17 @@ export function LeadsPage() {
 
   const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<SearchFormValues>({
     defaultValues: {
+      freeText: '',
+      keywords: '',
+      jobTitles: '',
       jobTitleScope: 'any',
+      companies: '',
       companyScope: 'current',
+      expertises: '',
       expertiseMode: 'must_have_any',
+      country: '',
+      states: '',
+      cities: '',
     },
   })
 
@@ -74,7 +82,7 @@ export function LeadsPage() {
       companyScope: v.companyScope,
       expertises: toList(v.expertises),
       expertiseMode: v.expertiseMode,
-      countries: v.country.trim() ? [v.country.trim()] : undefined,
+      countries: (v.country ?? '').trim() ? [(v.country ?? '').trim()] : undefined,
       states: toList(v.states),
       cities: toList(v.cities),
       pageNumber: 1,
@@ -353,3 +361,4 @@ export function LeadsPage() {
     </div>
   )
 }
+
