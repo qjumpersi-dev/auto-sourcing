@@ -4,17 +4,17 @@ namespace AutoSourcing.Services.Rhetorik;
 
 public class ProfileSearchRequest
 {
-    public List<string>? ProfileIds { get; set; }
-    public List<string>? Keywords { get; set; }
-    public List<string>? JobTitles { get; set; }
+    public List<string> ProfileIds { get; set; } = [];
+    public List<string> Keywords { get; set; } = [];
+    public List<string> JobTitles { get; set; } = [];
     public string JobTitleScope { get; set; } = "any";
-    public List<string>? Companies { get; set; }
+    public List<string> Companies { get; set; } = [];
     public string CompanyScope { get; set; } = "current";
-    public List<string>? Expertises { get; set; }
+    public List<string> Expertises { get; set; } = [];
     public string ExpertiseMode { get; set; } = "must_have_any";
-    public List<string>? Countries { get; set; }
-    public List<string>? States { get; set; }
-    public List<string>? Cities { get; set; }
+    public List<string> Countries { get; set; } = [];
+    public List<string> States { get; set; } = [];
+    public List<string> Cities { get; set; } = [];
     public int PageNumber { get; set; } = 1;
     public int PageSize { get; set; } = 100;
     public int MaxResults { get; set; } = 500;
