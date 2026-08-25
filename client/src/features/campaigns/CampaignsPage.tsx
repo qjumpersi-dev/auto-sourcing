@@ -81,7 +81,7 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <p className="text-sm text-muted-foreground">LoadingÃ¢â‚¬Â¦</p>
           ) : campaigns.length === 0 ? (
             <p className="text-sm text-muted-foreground">No campaigns yet.</p>
           ) : (

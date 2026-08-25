@@ -1,10 +1,11 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import type {
+  AutocompleteSuggestion,
   Campaign,
   Lead,
   OutreachMessage,
-  RhetorikSearchRequest,
-  RhetorikSearchResponse,
+  ProfileSearchRequest,
+  ProfileSearchResponse,
 } from '@/types/models'
 
 export const apiSlice = createApi({
@@ -16,10 +17,17 @@ export const apiSlice = createApi({
       query: () => '/leads',
       providesTags: ['Lead'],
     }),
-    searchRhetorik: builder.mutation<RhetorikSearchResponse, RhetorikSearchRequest>({
+    searchRhetorik: builder.mutation<ProfileSearchResponse, ProfileSearchRequest>({
       query: (request) => ({ url: '/leads/search-rhetorik', method: 'POST', body: request }),
     }),
-    importFromRhetorik: builder.mutation<Lead[], RhetorikSearchRequest>({
+    generateSearchSpec: builder.mutation<Partial<ProfileSearchRequest>, { text: string }>({
+      query: (body) => ({ url: '/leads/generate-search', method: 'POST', body }),
+    }),
+    autocomplete: builder.query<AutocompleteSuggestion[], { field: string; inputText: string }>({
+      query: ({ field, inputText }) =>
+        `/rhetorik/autocomplete?field=${encodeURIComponent(field)}&inputText=${encodeURIComponent(inputText)}`,
+    }),
+    importFromRhetorik: builder.mutation<Lead[], ProfileSearchRequest>({
       query: (request) => ({ url: '/leads/import', method: 'POST', body: request }),
       invalidatesTags: ['Lead'],
     }),
@@ -39,15 +47,14 @@ export const apiSlice = createApi({
       query: (body) => ({ url: '/campaigns', method: 'POST', body }),
       invalidatesTags: ['Campaign'],
     }),
-    updateCampaign: builder.mutation<void, { id: number; name: string; description?: string; status: number }>({
-      query: ({ id, ...body }) => ({ url: `/campaigns/${id}`, method: 'PUT', body }),
-      invalidatesTags: (_result, _error, arg) => ['Campaign', { type: 'Campaign', id: arg.id }],
-    }),
     getMessages: builder.query<OutreachMessage[], number>({
       query: (campaignId) => `/campaigns/${campaignId}/messages`,
       providesTags: ['OutreachMessage'],
     }),
-    createDraft: builder.mutation<OutreachMessage, { campaignId: number; leadId: number; subjectTemplate: string; bodyTemplate: string }>({
+    createDraft: builder.mutation<
+      OutreachMessage,
+      { campaignId: number; leadId: number; subjectTemplate: string; bodyTemplate: string }
+    >({
       query: ({ campaignId, ...body }) => ({
         url: `/campaigns/${campaignId}/messages/drafts`,
         method: 'POST',
@@ -68,12 +75,13 @@ export const apiSlice = createApi({
 export const {
   useGetLeadsQuery,
   useSearchRhetorikMutation,
+  useGenerateSearchSpecMutation,
+  useLazyAutocompleteQuery,
   useImportFromRhetorikMutation,
   useUpdateLeadStatusMutation,
   useGetCampaignsQuery,
   useGetCampaignQuery,
   useCreateCampaignMutation,
-  useUpdateCampaignMutation,
   useGetMessagesQuery,
   useCreateDraftMutation,
   useSendMessageMutation,

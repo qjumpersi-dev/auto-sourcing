@@ -23,8 +23,6 @@ export const LeadStatus = {
   OptedOut: 5,
 } as const
 
-export type LeadStatusValue = (typeof LeadStatus)[keyof typeof LeadStatus]
-
 export const leadStatusLabels: Record<number, string> = {
   [LeadStatus.New]: 'New',
   [LeadStatus.Contacted]: 'Contacted',
@@ -45,22 +43,12 @@ export interface Campaign {
   outreachMessages?: OutreachMessage[]
 }
 
-export const CampaignStatus = {
-  Draft: 0,
-  Active: 1,
-  Paused: 2,
-  Completed: 3,
-  Cancelled: 4,
-} as const
-
-export type CampaignStatusValue = (typeof CampaignStatus)[keyof typeof CampaignStatus]
-
 export const campaignStatusLabels: Record<number, string> = {
-  [CampaignStatus.Draft]: 'Draft',
-  [CampaignStatus.Active]: 'Active',
-  [CampaignStatus.Paused]: 'Paused',
-  [CampaignStatus.Completed]: 'Completed',
-  [CampaignStatus.Cancelled]: 'Cancelled',
+  0: 'Draft',
+  1: 'Active',
+  2: 'Paused',
+  3: 'Completed',
+  4: 'Cancelled',
 }
 
 export interface OutreachMessage {
@@ -85,42 +73,69 @@ export const OutreachMessageStatus = {
   Bounced: 4,
 } as const
 
-export type OutreachMessageStatusValue =
-  (typeof OutreachMessageStatus)[keyof typeof OutreachMessageStatus]
-
 export const messageStatusLabels: Record<number, string> = {
-  [OutreachMessageStatus.Draft]: 'Draft',
-  [OutreachMessageStatus.Queued]: 'Queued',
-  [OutreachMessageStatus.Sent]: 'Sent',
-  [OutreachMessageStatus.Failed]: 'Failed',
-  [OutreachMessageStatus.Bounced]: 'Bounced',
+  0: 'Draft',
+  1: 'Queued',
+  2: 'Sent',
+  3: 'Failed',
+  4: 'Bounced',
 }
 
-export interface RhetorikSearchRequest {
+export type Scope = 'any' | 'current' | 'past'
+
+export type ExpertiseMode =
+  | 'must_have_any'
+  | 'must_have_all'
+  | 'must_not_have_any'
+  | 'must_not_have_all'
+
+export interface ProfileSearchRequest {
   keywords?: string[]
   jobTitles?: string[]
+  jobTitleScope?: Scope
   companies?: string[]
+  companyScope?: Scope
+  expertises?: string[]
+  expertiseMode?: ExpertiseMode
   countries?: string[]
-  pageNumber: number
-  pageSize: number
+  states?: string[]
+  cities?: string[]
+  pageNumber?: number
+  pageSize?: number
+  maxResults?: number
 }
 
-export interface RhetorikContactResult {
+export interface RhetorikProfileResult {
   position: number
-  contactData?: {
-    contactId: string
-    firstName: string
-    lastName: string
-    emails?: { address: string; type?: string }[] | null
-    phones?: { number: string; type?: string }[] | null
-    companyName?: string | null
-    jobTitle?: string | null
-    country?: string | null
+  profile_data?: {
+    profile_id: string
+    profile_first_name: string
+    profile_last_name: string
+    profile_headline?: string | null
+    profile_summary?: string | null
+    profile_expertises?: string[] | null
+    profile_tags?: string[] | null
+    profile_address?: {
+      country?: string | null
+      state?: string | null
+      city?: string | null
+    } | null
+  } | null
+  contact_data?: {
+    contact_current_experiences?:
+      | { company_name?: string | null; job_title?: string | null; current?: boolean }[]
+      | null
   } | null
 }
 
-export interface RhetorikSearchResponse {
-  counts?: { contactsTotalResults: number }
-  results: RhetorikContactResult[]
-  pagination?: { current: number; lastPage: number; nextPage: number | null }
+export interface ProfileSearchResponse {
+  counts?: { profiles_total_results?: number }
+  results: RhetorikProfileResult[]
+  pagination?: { current: number; last_page: number; next_page: number | null }
 }
+
+export interface AutocompleteSuggestion {
+  content: string
+  count?: number | null
+}
+

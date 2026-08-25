@@ -108,7 +108,7 @@ export function CampaignDetailPage({
             <div className="space-y-1.5 max-w-sm">
               <Label htmlFor="leadId">Lead</Label>
               <Select {...register('leadId', { required: true })}>
-                <option value="">Select a lead…</option>
+                <option value="">Select a leadÃ¢â‚¬Â¦</option>
                 {leads.map((lead) => (
                   <option key={lead.id} value={lead.id}>
                     {lead.firstName} {lead.lastName}
@@ -177,7 +177,7 @@ export function CampaignDetailPage({
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>{message.subject ?? '—'}</TableCell>
+                    <TableCell>{message.subject ?? 'Ã¢â‚¬â€'}</TableCell>
                     <TableCell>
                       <Badge variant={messageVariant(message.status)}>
                         {messageStatusLabels[message.status]}
@@ -186,7 +186,7 @@ export function CampaignDetailPage({
                     <TableCell>
                       {message.sentAt
                         ? new Date(message.sentAt).toLocaleString()
-                        : '—'}
+                        : 'Ã¢â‚¬â€'}
                     </TableCell>
                     <TableCell className="text-right">
                       {message.status === OutreachMessageStatus.Draft ||
