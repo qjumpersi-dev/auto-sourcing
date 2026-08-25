@@ -37,6 +37,8 @@ export interface Campaign {
   name: string
   description: string | null
   status: number
+  subjectTemplate?: string | null
+  bodyTemplate?: string | null
   createdAt: string
   startedAt: string | null
   completedAt: string | null
@@ -90,6 +92,7 @@ export type ExpertiseMode =
   | 'must_not_have_all'
 
 export interface ProfileSearchRequest {
+  profileIds?: string[]
   keywords?: string[]
   jobTitles?: string[]
   jobTitleScope?: Scope
@@ -123,7 +126,7 @@ export interface RhetorikProfileResult {
   } | null
   contact_data?: {
     contact_current_experiences?:
-      | { company_name?: string | null; job_title?: string | null; current?: boolean }[]
+      | { company_name?: string | null; raw_company_name?: string | null; job_title?: string | null; current?: boolean }[]
       | null
   } | null
 }
@@ -138,4 +141,5 @@ export interface AutocompleteSuggestion {
   content: string
   count?: number | null
 }
+
 

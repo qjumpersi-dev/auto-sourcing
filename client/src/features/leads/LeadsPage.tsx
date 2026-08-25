@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { AlertCircle, Download, Loader2, Search, Sparkles } from 'lucide-react'
+import { AlertCircle, Download, Loader2, MailPlus, Search, Sparkles } from 'lucide-react'
 import {
+  useAddLeadsToCampaignMutation,
   useGenerateSearchSpecMutation,
+  useGetCampaignsQuery,
   useGetLeadsQuery,
   useImportFromRhetorikMutation,
   useSearchRhetorikMutation,
@@ -41,7 +43,7 @@ const expertiseModeLabels: Record<ExpertiseMode, string> = {
 }
 
 function toList(value: string): string[] | undefined {
-  const items = value.split(',').map((v) => v.trim()).filter(Boolean)
+  const items = (value ?? '').split(',').map((v) => v.trim()).filter(Boolean)
   return items.length > 0 ? items : undefined
 }
 
@@ -51,10 +53,16 @@ export function LeadsPage() {
   const [generateSpec] = useGenerateSearchSpecMutation()
   const [importFromRhetorik, { isLoading: importing }] = useImportFromRhetorikMutation()
   const [updateLeadStatus] = useUpdateLeadStatusMutation()
+  const [addLeadsToCampaign, { isLoading: adding }] = useAddLeadsToCampaignMutation()
+  const { data: campaigns = [] } = useGetCampaignsQuery()
 
   const [results, setResults] = useState<ProfileSearchResponse | null>(null)
   const [lastRequest, setLastRequest] = useState<ProfileSearchRequest | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [selectedResultIds, setSelectedResultIds] = useState<Set<string>>(new Set())
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<number>>(new Set())
+  const [targetCampaign, setTargetCampaign] = useState('')
+  const [addFeedback, setAddFeedback] = useState<string | null>(null)
 
   const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<SearchFormValues>({
     defaultValues: {
@@ -115,26 +123,100 @@ export function LeadsPage() {
   const onSearch = handleSubmit(async () => {
     setSearchError(null)
     setResults(null)
+    setSelectedResultIds(new Set())
     try {
       const request = buildRequest()
       const response = await searchRhetorik(request).unwrap()
       setLastRequest(request)
       setResults(response)
     } catch {
-      setSearchError(
-        'The search failed. Rhetorik may be having issues - try again or simplify the filters.',
-      )
+      setSearchError('The search failed. Rhetorik may be having issues - try again or simplify the filters.')
     }
   })
 
-  const onImport = async () => {
+  const toggleResult = (profileId: string) => {
+    setSelectedResultIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(profileId)) {
+        next.delete(profileId)
+      } else {
+        next.add(profileId)
+      }
+      return next
+    })
+  }
+
+  const allResultsSelected =
+    (results?.results.length ?? 0) > 0 &&
+    (results?.results ?? []).every((r) => r.profile_data && selectedResultIds.has(r.profile_data.profile_id))
+
+  const toggleAllResults = () => {
+    if (!results) return
+    if (allResultsSelected) {
+      setSelectedResultIds(new Set())
+    } else {
+      setSelectedResultIds(
+        new Set(results.results.map((r) => r.profile_data?.profile_id).filter((x): x is string => !!x)),
+      )
+    }
+  }
+
+  const onImportSelected = async () => {
+    if (selectedResultIds.size === 0 || !lastRequest) return
+    setSearchError(null)
+    try {
+      await importFromRhetorik({ ...lastRequest, profileIds: [...selectedResultIds] }).unwrap()
+      setSelectedResultIds(new Set())
+      setResults(null)
+    } catch {
+      setSearchError('Import failed. Please try again.')
+    }
+  }
+
+  const onImportAll = async () => {
     if (!lastRequest) return
     setSearchError(null)
     try {
       await importFromRhetorik(lastRequest).unwrap()
+      setSelectedResultIds(new Set())
       setResults(null)
     } catch {
       setSearchError('Import failed. Please try again.')
+    }
+  }
+
+  const toggleLead = (id: number) => {
+    setSelectedLeadIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const allLeadsSelected = leads.length > 0 && leads.every((l) => selectedLeadIds.has(l.id))
+
+  const toggleAllLeads = () => {
+    setSelectedLeadIds(allLeadsSelected ? new Set() : new Set(leads.map((l) => l.id)))
+  }
+
+  const onAddToCampaign = async () => {
+    if (!targetCampaign || selectedLeadIds.size === 0) return
+    setAddFeedback(null)
+    try {
+      const result = await addLeadsToCampaign({
+        campaignId: Number(targetCampaign),
+        leadIds: [...selectedLeadIds],
+      }).unwrap()
+      setAddFeedback(
+        `Added ${result.added} lead(s) to the campaign.${result.skipped > 0 ? ` ${result.skipped} skipped (already in campaign or opted out).` : ''}`,
+      )
+      setSelectedLeadIds(new Set())
+    } catch {
+      setAddFeedback('Could not add leads. Does the campaign have templates set?')
     }
   }
 
@@ -250,20 +332,41 @@ export function LeadsPage() {
 
           {results && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium">
                   Showing {results.results.length.toLocaleString()} of approx.{' '}
                   {(results.counts?.profiles_total_results ?? 0).toLocaleString()} matching profiles
                   (max 500 shown)
                 </p>
-                <Button onClick={onImport} disabled={importing || results.results.length === 0}>
-                  {importing ? <Loader2 className="animate-spin" /> : <Download />}
-                  Import all shown
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={onImportSelected}
+                    disabled={importing || selectedResultIds.size === 0}
+                  >
+                    {importing ? <Loader2 className="animate-spin" /> : <Download />}
+                    Import selected ({selectedResultIds.size})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={onImportAll}
+                    disabled={importing || results.results.length === 0}
+                  >
+                    {importing ? <Loader2 className="animate-spin" /> : <Download />}
+                    Import all shown
+                  </Button>
+                </div>
               </div>
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all results"
+                        checked={allResultsSelected}
+                        onChange={toggleAllResults}
+                      />
+                    </TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Company</TableHead>
                     <TableHead>Job title</TableHead>
@@ -277,12 +380,22 @@ export function LeadsPage() {
                       r.contact_data?.contact_current_experiences?.[0]
                     return (
                       <TableRow key={r.profile_data?.profile_id ?? r.position}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            aria-label="Select result"
+                            checked={!!r.profile_data && selectedResultIds.has(r.profile_data.profile_id)}
+                            onChange={() => {
+                              if (r.profile_data) toggleResult(r.profile_data.profile_id)
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {r.profile_data
                             ? `${r.profile_data.profile_first_name} ${r.profile_data.profile_last_name}`
                             : '-'}
                         </TableCell>
-                        <TableCell>{exp?.company_name ?? '-'}</TableCell>
+                        <TableCell>{exp?.raw_company_name ?? exp?.company_name ?? '-'}</TableCell>
                         <TableCell>
                           {exp?.job_title ?? r.profile_data?.profile_headline ?? '-'}
                         </TableCell>
@@ -310,16 +423,49 @@ export function LeadsPage() {
           <CardDescription>Imported contacts and their outreach status.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3">
+            <span className="text-sm text-muted-foreground">{selectedLeadIds.size} selected</span>
+            <Select
+              className="h-8 w-56 text-xs"
+              value={targetCampaign}
+              onChange={(e) => setTargetCampaign(e.target.value)}
+            >
+              <option value="">Pick a campaign...</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+            <Button
+              size="sm"
+              disabled={adding || selectedLeadIds.size === 0 || !targetCampaign}
+              onClick={onAddToCampaign}
+            >
+              {adding ? <Loader2 className="animate-spin" /> : <MailPlus />}
+              Add to campaign
+            </Button>
+            {addFeedback && <span className="text-xs text-muted-foreground">{addFeedback}</span>}
+          </div>
+
           {leadsLoading ? (
             <p className="text-sm text-muted-foreground">Loading...</p>
           ) : leads.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No leads yet - search above and import your first batch.
+              No leads yet - search above and import candidates first.
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all leads"
+                      checked={allLeadsSelected}
+                      onChange={toggleAllLeads}
+                    />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Company</TableHead>
@@ -330,6 +476,14 @@ export function LeadsPage() {
               <TableBody>
                 {leads.map((lead) => (
                   <TableRow key={lead.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        aria-label="Select lead"
+                        checked={selectedLeadIds.has(lead.id)}
+                        onChange={() => toggleLead(lead.id)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">
                       {lead.firstName} {lead.lastName}
                     </TableCell>

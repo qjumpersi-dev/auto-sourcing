@@ -62,22 +62,61 @@ public class LeadsController : ControllerBase
     public async Task<ActionResult<IEnumerable<Lead>>> ImportFromRhetorik([FromBody] ProfileSearchRequest request, CancellationToken cancellationToken)
     {
         var candidates = await _rhetorikClient.SearchAndMapToLeadsAsync(request, cancellationToken);
-        var existingExternalIds = await _dbContext.Leads
-            .Where(l => l.ExternalId != null)
+        var candidateExternalIds = candidates
+            .Where(l => !string.IsNullOrEmpty(l.ExternalId))
             .Select(l => l.ExternalId!)
-            .ToListAsync(cancellationToken);
-
-        var newLeads = candidates
-            .Where(l => string.IsNullOrEmpty(l.ExternalId) || !existingExternalIds.Contains(l.ExternalId))
             .ToList();
+
+        var existingByExternalId = await _dbContext.Leads
+            .Where(l => l.ExternalId != null && candidateExternalIds.Contains(l.ExternalId))
+            .ToDictionaryAsync(l => l.ExternalId!, cancellationToken);
+
+        var newLeads = new List<Lead>();
+        var enriched = 0;
+
+        foreach (var candidate in candidates)
+        {
+            if (string.IsNullOrEmpty(candidate.ExternalId) ||
+                !existingByExternalId.TryGetValue(candidate.ExternalId, out var existing))
+            {
+                newLeads.Add(candidate);
+                continue;
+            }
+
+            var changed = false;
+            if (!string.IsNullOrWhiteSpace(candidate.Company) && existing.Company != candidate.Company)
+            {
+                existing.Company = candidate.Company;
+                changed = true;
+            }
+            if (!string.IsNullOrWhiteSpace(candidate.JobTitle) && existing.JobTitle != candidate.JobTitle)
+            {
+                existing.JobTitle = candidate.JobTitle;
+                changed = true;
+            }
+            if (!string.IsNullOrWhiteSpace(candidate.Phone) && existing.Phone != candidate.Phone)
+            {
+                existing.Phone = candidate.Phone;
+                changed = true;
+            }
+            if (changed)
+            {
+                existing.UpdatedAt = DateTime.UtcNow;
+                enriched++;
+            }
+        }
 
         if (newLeads.Count > 0)
         {
             _dbContext.Leads.AddRange(newLeads);
+        }
+
+        if (newLeads.Count > 0 || enriched > 0)
+        {
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return Ok(newLeads);
+        return Ok(new { added = newLeads.Count, enriched });
     }
 
     [HttpPatch("{id:int}/status")]

@@ -4,6 +4,7 @@ namespace AutoSourcing.Services.Rhetorik;
 
 public class ProfileSearchRequest
 {
+    public List<string>? ProfileIds { get; set; }
     public List<string>? Keywords { get; set; }
     public List<string>? JobTitles { get; set; }
     public string JobTitleScope { get; set; } = "any";
@@ -28,6 +29,8 @@ public class ProfileSearchRequest
     internal Dictionary<string, object> BuildParameters()
     {
         var parameters = new Dictionary<string, object>();
+
+        AddIsOneOf(parameters, ProfileIds, "profile_id");
 
         if (Keywords is { Count: > 0 })
         {
@@ -179,6 +182,9 @@ public class RhetorikExperience
 {
     [JsonPropertyName("company_name")]
     public string? CompanyName { get; set; }
+    [JsonPropertyName("raw_company_name")]
+    public string? RawCompanyName { get; set; }
+
 
     [JsonPropertyName("job_title")]
     public string? JobTitle { get; set; }
@@ -201,4 +207,6 @@ public class AutocompleteSuggestion
     [JsonPropertyName("count")]
     public int? Count { get; set; }
 }
+
+
 

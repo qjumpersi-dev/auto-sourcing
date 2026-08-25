@@ -136,14 +136,17 @@ public class RhetorikClient : IRhetorikClient
 
         return new Lead
         {
-            ExternalId = p.ProfileId,
-            FirstName = p.FirstName,
-            LastName = p.LastName,
+            ExternalId = p.ProfileId ?? string.Empty,
+            FirstName = (p.FirstName ?? string.Empty).Trim(),
+            LastName = (p.LastName ?? string.Empty).Trim(),
             Email = string.Empty,
-            Company = currentExperience?.CompanyName ?? p.Headline,
-            JobTitle = currentExperience?.JobTitle ?? p.Headline,
+            Company = currentExperience?.RawCompanyName ?? currentExperience?.CompanyName,
+            JobTitle = currentExperience?.JobTitle ?? p.Headline ?? string.Empty,
             LinkedInUrl = null,
             Source = $"Rhetorik:{ProfileSearchEndpoint}"
         };
     }
 }
+
+
+

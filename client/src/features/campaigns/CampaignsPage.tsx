@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 
 interface CampaignFormValues {
+  subjectTemplate?: string
+  bodyTemplate?: string
   name: string
   description?: string
 }
@@ -60,10 +62,26 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                rows={4}
+                rows={2}
                 placeholder="What is this campaign about?"
                 {...register('description')}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="subjectTemplate">Subject template</Label>
+              <Input
+                id="subjectTemplate"
+                placeholder="Quick question, {'{{FirstName}}'}"
+                {...register('subjectTemplate')}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bodyTemplate">Body template</Label>
+              <Textarea id="bodyTemplate" rows={5} {...register('bodyTemplate')} />
+              <p className="text-xs text-muted-foreground">
+                Used to auto-draft messages when you add leads to this campaign. Supports
+                {'{{FirstName}}'}, {'{{Company}}'}, {'{{JobTitle}}'}.
+              </p>
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
             <Button type="submit" disabled={creating} className="w-full">
@@ -81,7 +99,7 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">LoadingÃ¢â‚¬Â¦</p>
+            <p className="text-sm text-muted-foreground">LoadingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</p>
           ) : campaigns.length === 0 ? (
             <p className="text-sm text-muted-foreground">No campaigns yet.</p>
           ) : (
