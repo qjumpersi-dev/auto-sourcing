@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Loader2, MailPlus, Send } from 'lucide-react'
+import { ArrowLeft, Loader2, MailPlus, Save, Send } from 'lucide-react'
 import {
   useCreateDraftMutation,
   useGetCampaignQuery,
+  useUpdateCampaignMutation,
   useGetLeadsQuery,
   useGetMessagesQuery,
   useSendMessageMutation,
@@ -54,6 +55,8 @@ export function CampaignDetailPage({
   const [createDraft, { isLoading: creating }] = useCreateDraftMutation()
   const [sendMessage, { isLoading: sending }] = useSendMessageMutation()
   const [draftError, setDraftError] = useState<string | null>(null)
+  const [templateState, setTemplateState] = useState<{ subject: string; body: string } | null>(null)
+  const [savedTemplates, setSavedTemplates] = useState(false)
 
   const {
     register,
@@ -65,6 +68,31 @@ export function CampaignDetailPage({
   useEffect(() => {
     setDraftError(null)
   }, [campaignId])
+  useEffect(() => {
+    if (campaign && templateState === null) {
+      setTemplateState({ subject: campaign.subjectTemplate ?? '', body: campaign.bodyTemplate ?? '' })
+    }
+  }, [campaign, templateState])
+
+  const [updateCampaign, { isLoading: savingTemplates }] = useUpdateCampaignMutation()
+
+  const onSaveTemplates = async () => {
+    if (!campaign || !templateState) return
+    setSavedTemplates(false)
+    try {
+      await updateCampaign({
+        id: campaign.id,
+        name: campaign.name,
+        description: campaign.description ?? undefined,
+        status: campaign.status,
+        subjectTemplate: templateState.subject,
+        bodyTemplate: templateState.body,
+      }).unwrap()
+      setSavedTemplates(true)
+    } catch {
+      setDraftError('Could not save templates.')
+    }
+  }
 
   const onSubmit = handleSubmit(async (values) => {
     setDraftError(null)
@@ -97,6 +125,54 @@ export function CampaignDetailPage({
 
       <Card>
         <CardHeader>
+          <CardTitle>Campaign templates</CardTitle>
+          <CardDescription>
+            Used to auto-draft messages when leads are added to this campaign. Supports{' '}
+            {'{{FirstName}}'}, {'{{LastName}}'}, {'{{Company}}'}, {'{{JobTitle}}'}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {templateState && (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="tplSubject">Subject template</Label>
+                <Input
+                  id="tplSubject"
+                  value={templateState.subject}
+                  onChange={(e) => {
+                    setTemplateState({ ...templateState, subject: e.target.value })
+                    setSavedTemplates(false)
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tplBody">Body template</Label>
+                <Textarea
+                  id="tplBody"
+                  rows={6}
+                  value={templateState.body}
+                  onChange={(e) => {
+                    setTemplateState({ ...templateState, body: e.target.value })
+                    setSavedTemplates(false)
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button type="button" variant="outline" disabled={savingTemplates} onClick={onSaveTemplates}>
+                  {savingTemplates ? <Loader2 className="animate-spin" /> : <Save />}
+                  Save templates
+                </Button>
+                {savedTemplates && (
+                  <span className="text-xs text-muted-foreground">Templates saved.</span>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Create draft</CardTitle>
           <CardDescription>
             Personalise with {'{{FirstName}}'}, {'{{LastName}}'}, {'{{Company}}'},{' '}
@@ -108,7 +184,7 @@ export function CampaignDetailPage({
             <div className="space-y-1.5 max-w-sm">
               <Label htmlFor="leadId">Lead</Label>
               <Select {...register('leadId', { required: true })}>
-                <option value="">Select a leadÃ¢â‚¬Â¦</option>
+                <option value="">Select a leadÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</option>
                 {leads.map((lead) => (
                   <option key={lead.id} value={lead.id}>
                     {lead.firstName} {lead.lastName}
@@ -177,7 +253,7 @@ export function CampaignDetailPage({
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>{message.subject ?? 'Ã¢â‚¬â€'}</TableCell>
+                    <TableCell>{message.subject ?? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</TableCell>
                     <TableCell>
                       <Badge variant={messageVariant(message.status)}>
                         {messageStatusLabels[message.status]}
@@ -186,7 +262,7 @@ export function CampaignDetailPage({
                     <TableCell>
                       {message.sentAt
                         ? new Date(message.sentAt).toLocaleString()
-                        : 'Ã¢â‚¬â€'}
+                        : 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}
                     </TableCell>
                     <TableCell className="text-right">
                       {message.status === OutreachMessageStatus.Draft ||
@@ -218,3 +294,4 @@ export function CampaignDetailPage({
     </div>
   )
 }
+

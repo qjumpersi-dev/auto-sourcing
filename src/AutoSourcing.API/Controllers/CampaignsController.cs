@@ -1,5 +1,6 @@
 using AutoSourcing.Core.Entities;
 using AutoSourcing.Data;
+using AutoSourcing.Services.Outreach;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -66,5 +67,42 @@ public class CampaignsController : ControllerBase
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+}
+
+
+public class AddLeadsRequest
+{
+    public int[] LeadIds { get; set; } = [];
+}
+
+[ApiController]
+[Route("api/campaigns/{campaignId:int}/leads")]
+public class CampaignLeadsController : ControllerBase
+{
+    private readonly IOutreachService _outreachService;
+
+    public CampaignLeadsController(IOutreachService outreachService)
+    {
+        _outreachService = outreachService;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> AddLeads(int campaignId, [FromBody] AddLeadsRequest request, CancellationToken cancellationToken)
+    {
+        if (request.LeadIds.Length == 0)
+        {
+            return BadRequest(new { error = "No leads selected." });
+        }
+
+        try
+        {
+            var created = await _outreachService.AddLeadsToCampaignAsync(campaignId, request.LeadIds, cancellationToken);
+            return Ok(new { added = created.Count, skipped = request.LeadIds.Length - created.Count });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 }

@@ -37,6 +37,8 @@ export interface Campaign {
   name: string
   description: string | null
   status: number
+  subjectTemplate?: string | null
+  bodyTemplate?: string | null
   createdAt: string
   startedAt: string | null
   completedAt: string | null

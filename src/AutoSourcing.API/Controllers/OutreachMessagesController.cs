@@ -42,7 +42,32 @@ public class OutreachMessagesController : ControllerBase
             .Include(m => m.Lead)
             .AsNoTracking()
             .OrderBy(m => m.CreatedAt)
+            .Select(m => new
+            {
+                m.Id,
+                m.LeadId,
+                m.CampaignId,
+                m.Channel,
+                m.Subject,
+                m.Body,
+                m.Status,
+                m.ErrorMessage,
+                m.CreatedAt,
+                m.SentAt,
+                Lead = new
+                {
+                    m.Lead.Id,
+                    m.Lead.FirstName,
+                    m.Lead.LastName,
+                    m.Lead.Email,
+                    m.Lead.Company,
+                    m.Lead.JobTitle,
+                    m.Lead.Status
+                }
+            })
             .ToListAsync(cancellationToken);
+
+        return Ok(messages);
 
         return Ok(messages);
     }

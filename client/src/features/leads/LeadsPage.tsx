@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { AlertCircle, Download, Loader2, Search, Sparkles } from 'lucide-react'
+import { AlertCircle, Download, Loader2, MailPlus, Search, Sparkles } from 'lucide-react'
 import {
+  useAddLeadsToCampaignMutation,
   useGenerateSearchSpecMutation,
+  useGetCampaignsQuery,
   useGetLeadsQuery,
   useImportFromRhetorikMutation,
   useSearchRhetorikMutation,
@@ -51,6 +53,11 @@ export function LeadsPage() {
   const [generateSpec] = useGenerateSearchSpecMutation()
   const [importFromRhetorik, { isLoading: importing }] = useImportFromRhetorikMutation()
   const [updateLeadStatus] = useUpdateLeadStatusMutation()
+  const [addLeadsToCampaign, { isLoading: adding }] = useAddLeadsToCampaignMutation()
+  const { data: campaigns = [] } = useGetCampaignsQuery()
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [targetCampaign, setTargetCampaign] = useState<string>("")
+  const [addFeedback, setAddFeedback] = useState<string | null>(null)
 
   const [results, setResults] = useState<ProfileSearchResponse | null>(null)
   const [lastRequest, setLastRequest] = useState<ProfileSearchRequest | null>(null)
@@ -137,6 +144,39 @@ export function LeadsPage() {
       setSearchError('Import failed. Please try again.')
     }
   }
+  const toggleLead = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id))
+
+  const toggleAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(leads.map((l) => l.id)))
+  }
+
+  const onAddToCampaign = async () => {
+    if (!targetCampaign || selectedIds.size === 0) return
+    setAddFeedback(null)
+    try {
+      const result = await addLeadsToCampaign({
+        campaignId: Number(targetCampaign),
+        leadIds: [...selectedIds],
+      }).unwrap()
+      setAddFeedback(`Added ${result.added} lead(s) to the campaign.${result.skipped > 0 ? ` ${result.skipped} skipped (already in campaign or opted out).` : ''}`)
+      setSelectedIds(new Set())
+    } catch {
+      setAddFeedback('Could not add leads. Does the campaign have templates set?')
+    }
+  }
+
 
   return (
     <div className="space-y-6">
@@ -310,6 +350,33 @@ export function LeadsPage() {
           <CardDescription>Imported contacts and their outreach status.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3">
+            <span className="text-sm text-muted-foreground">
+              {selectedIds.size} selected
+            </span>
+            <Select
+              className="h-8 w-56 text-xs"
+              value={targetCampaign}
+              onChange={(e) => setTargetCampaign(e.target.value)}
+            >
+              <option value="">Pick a campaign...</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+            <Button
+              size="sm"
+              disabled={adding || selectedIds.size === 0 || !targetCampaign}
+              onClick={onAddToCampaign}
+            >
+              {adding ? <Loader2 className="animate-spin" /> : <MailPlus />}
+              Add to campaign
+            </Button>
+            {addFeedback && <span className="text-xs text-muted-foreground">{addFeedback}</span>}
+          </div>
+
           {leadsLoading ? (
             <p className="text-sm text-muted-foreground">Loading...</p>
           ) : leads.length === 0 ? (
@@ -320,6 +387,7 @@ export function LeadsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10"><input type="checkbox" aria-label="Select all" checked={allSelected} onChange={toggleAll} /></TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Company</TableHead>
@@ -330,6 +398,7 @@ export function LeadsPage() {
               <TableBody>
                 {leads.map((lead) => (
                   <TableRow key={lead.id}>
+                    <TableCell><input type="checkbox" aria-label="Select lead" checked={selectedIds.has(lead.id)} onChange={() => toggleLead(lead.id)} /></TableCell>
                     <TableCell className="font-medium">
                       {lead.firstName} {lead.lastName}
                     </TableCell>

@@ -43,9 +43,30 @@ export const apiSlice = createApi({
       query: (id) => `/campaigns/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Campaign', id }],
     }),
-    createCampaign: builder.mutation<Campaign, { name: string; description?: string }>({
+    createCampaign: builder.mutation<Campaign, { name: string; description?: string; subjectTemplate?: string; bodyTemplate?: string }>({
       query: (body) => ({ url: '/campaigns', method: 'POST', body }),
       invalidatesTags: ['Campaign'],
+    }),
+    updateCampaign: builder.mutation<
+      void,
+      { id: number; name: string; description?: string; subjectTemplate?: string; bodyTemplate?: string; status: number }
+    >({
+      query: ({ id, ...body }) => ({ url: `/campaigns/${id}`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, arg) => ['Campaign', { type: 'Campaign', id: arg.id }],
+    }),
+    addLeadsToCampaign: builder.mutation<
+      { added: number; skipped: number },
+      { campaignId: number; leadIds: number[] }
+    >({
+      query: ({ campaignId, leadIds }) => ({
+        url: `/campaigns/${campaignId}/leads`,
+        method: 'POST',
+        body: { leadIds },
+      }),
+      invalidatesTags: (_result, _error, arg) => [
+        'OutreachMessage',
+        { type: 'Campaign', id: arg.campaignId },
+      ],
     }),
     getMessages: builder.query<OutreachMessage[], number>({
       query: (campaignId) => `/campaigns/${campaignId}/messages`,
@@ -85,4 +106,7 @@ export const {
   useGetMessagesQuery,
   useCreateDraftMutation,
   useSendMessageMutation,
+  useUpdateCampaignMutation,
+  useAddLeadsToCampaignMutation,
 } = apiSlice
+
