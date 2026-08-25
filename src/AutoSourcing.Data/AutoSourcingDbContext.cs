@@ -19,7 +19,7 @@ public class AutoSourcingDbContext : DbContext
 
         modelBuilder.Entity<Lead>(entity =>
         {
-            entity.HasIndex(l => l.Email).IsUnique();
+            entity.HasIndex(l => l.Email).IsUnique().HasFilter("[Email] <> ''");
             entity.HasIndex(l => l.ExternalId);
             entity.Property(l => l.FirstName).HasMaxLength(100).IsRequired();
             entity.Property(l => l.LastName).HasMaxLength(100).IsRequired();
