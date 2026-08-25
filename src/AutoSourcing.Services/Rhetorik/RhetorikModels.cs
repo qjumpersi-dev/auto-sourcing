@@ -182,6 +182,9 @@ public class RhetorikExperience
 {
     [JsonPropertyName("company_name")]
     public string? CompanyName { get; set; }
+    [JsonPropertyName("raw_company_name")]
+    public string? RawCompanyName { get; set; }
+
 
     [JsonPropertyName("job_title")]
     public string? JobTitle { get; set; }
@@ -204,5 +207,6 @@ public class AutocompleteSuggestion
     [JsonPropertyName("count")]
     public int? Count { get; set; }
 }
+
 
 

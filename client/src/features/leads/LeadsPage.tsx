@@ -395,7 +395,7 @@ export function LeadsPage() {
                             ? `${r.profile_data.profile_first_name} ${r.profile_data.profile_last_name}`
                             : '-'}
                         </TableCell>
-                        <TableCell>{exp?.company_name ?? '-'}</TableCell>
+                        <TableCell>{exp?.raw_company_name ?? exp?.company_name ?? '-'}</TableCell>
                         <TableCell>
                           {exp?.job_title ?? r.profile_data?.profile_headline ?? '-'}
                         </TableCell>
@@ -515,3 +515,4 @@ export function LeadsPage() {
     </div>
   )
 }
+

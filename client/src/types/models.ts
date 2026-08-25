@@ -126,7 +126,7 @@ export interface RhetorikProfileResult {
   } | null
   contact_data?: {
     contact_current_experiences?:
-      | { company_name?: string | null; job_title?: string | null; current?: boolean }[]
+      | { company_name?: string | null; raw_company_name?: string | null; job_title?: string | null; current?: boolean }[]
       | null
   } | null
 }
@@ -141,4 +141,5 @@ export interface AutocompleteSuggestion {
   content: string
   count?: number | null
 }
+
 

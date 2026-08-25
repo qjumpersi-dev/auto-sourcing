@@ -140,10 +140,11 @@ public class RhetorikClient : IRhetorikClient
             FirstName = p.FirstName,
             LastName = p.LastName,
             Email = string.Empty,
-            Company = currentExperience?.CompanyName ?? p.Headline,
+            Company = currentExperience?.RawCompanyName ?? currentExperience?.CompanyName ?? p.Headline,
             JobTitle = currentExperience?.JobTitle ?? p.Headline,
             LinkedInUrl = null,
             Source = $"Rhetorik:{ProfileSearchEndpoint}"
         };
     }
 }
+
