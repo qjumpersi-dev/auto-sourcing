@@ -1,11 +1,17 @@
 using AutoSourcing.Core.Entities;
 using AutoSourcing.Core.Enums;
 using AutoSourcing.Data;
+using AutoSourcing.Services.NLSearch;
 using AutoSourcing.Services.Rhetorik;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace AutoSourcing.API.Controllers;
+
+public class GenerateSearchRequest
+{
+    public string Text { get; set; } = string.Empty;
+}
 
 [ApiController]
 [Route("api/[controller]")]
@@ -13,11 +19,13 @@ public class LeadsController : ControllerBase
 {
     private readonly AutoSourcingDbContext _dbContext;
     private readonly IRhetorikClient _rhetorikClient;
+    private readonly INLSearchService _nlSearchService;
 
-    public LeadsController(AutoSourcingDbContext dbContext, IRhetorikClient rhetorikClient)
+    public LeadsController(AutoSourcingDbContext dbContext, IRhetorikClient rhetorikClient, INLSearchService nlSearchService)
     {
         _dbContext = dbContext;
         _rhetorikClient = rhetorikClient;
+        _nlSearchService = nlSearchService;
     }
 
     [HttpGet]
@@ -34,14 +42,24 @@ public class LeadsController : ControllerBase
     }
 
     [HttpPost("search-rhetorik")]
-    public async Task<ActionResult<IReadOnlyList<Lead>>> SearchRhetorik([FromBody] RhetorikSearchRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ProfileSearchResponse>> SearchRhetorik([FromBody] ProfileSearchRequest request, CancellationToken cancellationToken)
     {
-        var profiles = await _rhetorikClient.SearchContactsAsync(request, cancellationToken);
-        return Ok(profiles);
+        return Ok(await _rhetorikClient.SearchProfilesAsync(request, cancellationToken));
+    }
+
+    [HttpPost("generate-search")]
+    public async Task<ActionResult<ProfileSearchRequest>> GenerateSearch([FromBody] GenerateSearchRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Text))
+        {
+            return BadRequest(new { error = "Text is required." });
+        }
+
+        return Ok(await _nlSearchService.GenerateSearchSpecAsync(request.Text, cancellationToken));
     }
 
     [HttpPost("import")]
-    public async Task<ActionResult<IEnumerable<Lead>>> ImportFromRhetorik([FromBody] RhetorikSearchRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<IEnumerable<Lead>>> ImportFromRhetorik([FromBody] ProfileSearchRequest request, CancellationToken cancellationToken)
     {
         var candidates = await _rhetorikClient.SearchAndMapToLeadsAsync(request, cancellationToken);
         var existingExternalIds = await _dbContext.Leads
