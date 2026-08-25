@@ -19,6 +19,7 @@ export function SuggestionInput({
   const [trigger, { isFetching }] = useLazyAutocompleteQuery()
   const [text, setText] = useState(value ?? '')
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [failed, setFailed] = useState(false)
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -40,14 +41,17 @@ export function SuggestionInput({
   useEffect(() => {
     if (!open || text.trim().length < 2) {
       setSuggestions([])
+      setFailed(false)
       return
     }
     const timer = setTimeout(async () => {
       try {
         const result = await trigger({ field, inputText: text.trim() }).unwrap()
         setSuggestions(result.map((s) => s.content))
+        setFailed(false)
       } catch {
         setSuggestions([])
+        setFailed(true)
       }
     }, 300)
     return () => clearTimeout(timer)
@@ -72,6 +76,16 @@ export function SuggestionInput({
           <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
         )}
       </div>
+      {open && text.trim().length >= 2 && !isFetching && failed && (
+        <div className="absolute z-20 mt-1 w-full rounded-md border border-destructive/30 bg-popover px-3 py-2 text-sm text-destructive shadow-md">
+          Can't reach the server - is the API running?
+        </div>
+      )}
+      {open && text.trim().length >= 2 && !isFetching && !failed && suggestions.length === 0 && (
+        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover px-3 py-2 text-sm text-muted-foreground shadow-md">
+          No matches found
+        </div>
+      )}
       {open && suggestions.length > 0 && (
         <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-popover py-1 text-sm shadow-md">
           {suggestions.map((s) => (
@@ -94,3 +108,4 @@ export function SuggestionInput({
     </div>
   )
 }
+
