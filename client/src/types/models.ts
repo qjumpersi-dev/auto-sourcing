@@ -92,6 +92,7 @@ export type ExpertiseMode =
   | 'must_not_have_all'
 
 export interface ProfileSearchRequest {
+  profileIds?: string[]
   keywords?: string[]
   jobTitles?: string[]
   jobTitleScope?: Scope
