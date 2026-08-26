@@ -69,7 +69,6 @@ public class OutreachMessagesController : ControllerBase
 
         return Ok(messages);
 
-        return Ok(messages);
     }
 
     [HttpPost("drafts")]

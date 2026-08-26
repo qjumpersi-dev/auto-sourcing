@@ -35,6 +35,7 @@ public class NLSearchService : INLSearchService
     public NLSearchService(HttpClient httpClient, IOptions<NLSearchOptions> options, ILogger<NLSearchService> logger)
     {
         _httpClient = httpClient;
+        _httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
         _options = options.Value;
         _logger = logger;
     }
@@ -184,3 +185,4 @@ public class NLSearchService : INLSearchService
     private static string ValidScope(string value, string fallback) =>
         value is "any" or "current" or "past" ? value : fallback;
 }
+
