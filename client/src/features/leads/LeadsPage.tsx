@@ -63,6 +63,7 @@ export function LeadsPage() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<number>>(new Set())
   const [targetCampaign, setTargetCampaign] = useState('')
   const [addFeedback, setAddFeedback] = useState<string | null>(null)
+  const [jobTitleSuggestions, setJobTitleSuggestions] = useState<string[]>([])
 
   const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<SearchFormValues>({
     defaultValues: {
@@ -105,7 +106,6 @@ export function LeadsPage() {
     setSearchError(null)
     try {
       const spec = await generateSpec({ text }).unwrap()
-      if (spec.keywords?.length) setValue('keywords', spec.keywords.join(', '))
       if (spec.jobTitles?.length) setValue('jobTitles', spec.jobTitles.join(', '))
       if (spec.jobTitleScope) setValue('jobTitleScope', spec.jobTitleScope)
       if (spec.companies?.length) setValue('companies', spec.companies.join(', '))
@@ -115,6 +115,7 @@ export function LeadsPage() {
       if (spec.countries?.length) setValue('country', spec.countries[0])
       if (spec.states?.length) setValue('states', spec.states.join(', '))
       if (spec.cities?.length) setValue('cities', spec.cities.join(', '))
+      setJobTitleSuggestions(spec.jobTitleSuggestions ?? [])
     } catch {
       setSearchError('Could not auto-build the search. Fill the fields manually.')
     }
@@ -220,6 +221,15 @@ export function LeadsPage() {
     }
   }
 
+  const appendJobTitleSuggestion = (s: string) => {
+    const current = getValues('jobTitles') ?? ''
+    const parts = current.split(',').map((p) => p.trim()).filter(Boolean)
+    if (!parts.some((p) => p.toLowerCase() === s.toLowerCase())) {
+      setValue('jobTitles', [...parts, s].join(', '))
+    }
+    setJobTitleSuggestions((prev) => prev.filter((x) => x !== s))
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -236,7 +246,7 @@ export function LeadsPage() {
             <div className="flex gap-2">
               <Input
                 id="freeText"
-                placeholder='e.g. "Senior .NET developers in Auckland with AWS skills"'
+                placeholder='e.g. "Senior .NET developers in Auckland with Azure skills"'
                 {...register('freeText')}
               />
               <Button type="button" variant="outline" onClick={onAutoBuild}>
@@ -257,6 +267,21 @@ export function LeadsPage() {
               <Input id="jobTitles" placeholder="Developer" {...register('jobTitles')} />
               {errors.jobTitles && (
                 <p className="text-xs text-destructive">{errors.jobTitles.message}</p>
+              )}
+              {jobTitleSuggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-xs text-muted-foreground">Also try:</span>
+                  {jobTitleSuggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className="rounded-full border px-2 py-0.5 text-xs hover:bg-accent"
+                      onClick={() => appendJobTitleSuggestion(s)}
+                    >
+                      + {s}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
             <div className="space-y-1.5">
@@ -515,4 +540,3 @@ export function LeadsPage() {
     </div>
   )
 }
-

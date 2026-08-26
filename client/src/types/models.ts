@@ -103,6 +103,7 @@ export interface ProfileSearchRequest {
   countries?: string[]
   states?: string[]
   cities?: string[]
+  jobTitleSuggestions?: string[]
   pageNumber?: number
   pageSize?: number
   maxResults?: number
@@ -141,5 +142,6 @@ export interface AutocompleteSuggestion {
   content: string
   count?: number | null
 }
+
 
 

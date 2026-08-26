@@ -15,6 +15,7 @@ public class ProfileSearchRequest
     public List<string> Countries { get; set; } = [];
     public List<string> States { get; set; } = [];
     public List<string> Cities { get; set; } = [];
+    public List<string> JobTitleSuggestions { get; set; } = [];
     public int PageNumber { get; set; } = 1;
     public int PageSize { get; set; } = 100;
     public int MaxResults { get; set; } = 500;

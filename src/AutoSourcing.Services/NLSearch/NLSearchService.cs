@@ -19,13 +19,20 @@ public class NLSearchService : INLSearchService
           "keywords": [], "jobTitles": [], "jobTitleScope": "any|current|past",
           "companies": [], "companyScope": "any|current|past",
           "expertises": [], "expertiseMode": "must_have_any|must_have_all|must_not_have_any|must_not_have_all",
-          "countries": [], "states": [], "cities": []
+          "countries": [], "states": [], "cities": [],
+          "jobTitleSuggestions": []
         }
         Rules:
         - jobTitleScope: "current" when they want people in the role now; "past" for experience; default "any".
         - companyScope: "current" for employers now; "past" for alumni; default "any".
         - expertiseMode: "must_have_any" unless the request demands all skills ("and", "all of") or excludes skills ("not", "without").
         - Use full country names (e.g. "New Zealand"). Skills go in expertises.
+        - NEVER put job titles, skills, companies or locations into "keywords" - leave "keywords" empty.
+        - Strip the word "skills" from expertise values: "sourcing skills" becomes "sourcing".
+        - When there is more than one expertise, expertiseMode MUST be "must_have_any".
+        - Normalise the main job title to its standard form (e.g. "recruiter" -> "Recruiter").
+        - jobTitleSuggestions: 2-4 alternative job titles for the same role
+          (e.g. "talent acquisition manager" -> ["Talent Acquisition Specialist", "Recruitment Manager", "Resourcing Manager"]).
         """;
 
     private readonly HttpClient _httpClient;
@@ -126,7 +133,6 @@ public class NLSearchService : INLSearchService
             else
             {
                 request.JobTitles.Add(term);
-                request.Keywords.Add(term);
             }
         }
 
@@ -144,7 +150,7 @@ public class NLSearchService : INLSearchService
     }
 
     private static List<string> SplitTerms(string text) =>
-        text.Split(new[] { ",", ";", " and ", " or ", " with ", " without ", " not ", " who " }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        text.Split([",", ";", " and ", " or ", " with ", " without ", " not ", " who "], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .Where(t => t.Length > 1)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -169,8 +175,18 @@ public class NLSearchService : INLSearchService
 
     private static void Normalize(ProfileSearchRequest r)
     {
+        r.Keywords ??= [];
+        r.JobTitles ??= [];
+        r.Companies ??= [];
+        r.Expertises ??= [];
+        r.Countries ??= [];
+        r.States ??= [];
+        r.Cities ??= [];
+        r.JobTitleSuggestions ??= [];
+
         r.JobTitleScope = ValidScope(r.JobTitleScope, "any");
         r.CompanyScope = ValidScope(r.CompanyScope, "current");
+
         var modes = new[]
         {
             ProfileSearchRequest.MustHaveAny, ProfileSearchRequest.MustHaveAll,
@@ -180,9 +196,21 @@ public class NLSearchService : INLSearchService
         {
             r.ExpertiseMode = ProfileSearchRequest.MustHaveAny;
         }
+
+        r.Expertises = r.Expertises
+            .Select(e => System.Text.RegularExpressions.Regex.Replace(e.Trim(), @"\s+skills$", string.Empty, System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim())
+            .Where(e => e.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        r.JobTitles = r.JobTitles
+            .Select(t => t.Trim())
+            .Where(t => t.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     }
 
     private static string ValidScope(string value, string fallback) =>
         value is "any" or "current" or "past" ? value : fallback;
 }
-
