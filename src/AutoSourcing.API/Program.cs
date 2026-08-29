@@ -3,6 +3,7 @@ using AutoSourcing.Services.Email;
 using AutoSourcing.Services.NLSearch;
 using AutoSourcing.Services.Outreach;
 using AutoSourcing.Services.Rhetorik;
+using AutoSourcing.Services.Scotty;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +18,9 @@ builder.Services.AddDbContext<AutoSourcingDbContext>(options =>
 
 builder.Services.Configure<RhetorikOptions>(builder.Configuration.GetSection(RhetorikOptions.SectionName));
 builder.Services.AddHttpClient<IRhetorikClient, RhetorikClient>();
+
+builder.Services.Configure<ScottyOptions>(builder.Configuration.GetSection(ScottyOptions.SectionName));
+builder.Services.AddHttpClient<IScottyClient, ScottyClient>();
 
 builder.Services.Configure<NLSearchOptions>(builder.Configuration.GetSection(NLSearchOptions.SectionName));
 builder.Services.AddHttpClient<INLSearchService, NLSearchService>();

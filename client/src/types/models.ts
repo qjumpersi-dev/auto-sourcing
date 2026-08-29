@@ -12,6 +12,7 @@ export interface Lead {
   status: number
   createdAt: string
   updatedAt: string | null
+  campaigns?: CampaignRef[] | null
 }
 
 export const LeadStatus = {
@@ -30,6 +31,14 @@ export const leadStatusLabels: Record<number, string> = {
   [LeadStatus.Qualified]: 'Qualified',
   [LeadStatus.Unresponsive]: 'Unresponsive',
   [LeadStatus.OptedOut]: 'Opted out',
+}
+
+export interface PaginatedLeads {
+  items: Lead[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
 }
 
 export interface Campaign {
@@ -103,6 +112,7 @@ export interface ProfileSearchRequest {
   countries?: string[]
   states?: string[]
   cities?: string[]
+  jobTitleSuggestions?: string[]
   pageNumber?: number
   pageSize?: number
   maxResults?: number
@@ -131,9 +141,25 @@ export interface RhetorikProfileResult {
   } | null
 }
 
+export interface CampaignRef {
+  id: number
+  name: string
+}
+
+export interface EnrichedRhetorikProfileResult extends RhetorikProfileResult {
+  lead_id?: number | null
+  campaigns?: CampaignRef[] | null
+}
+
 export interface ProfileSearchResponse {
   counts?: { profiles_total_results?: number }
   results: RhetorikProfileResult[]
+  pagination?: { current: number; last_page: number; next_page: number | null }
+}
+
+export interface EnrichedProfileSearchResponse {
+  counts?: { profiles_total_results?: number }
+  results: EnrichedRhetorikProfileResult[]
   pagination?: { current: number; last_page: number; next_page: number | null }
 }
 
@@ -141,5 +167,34 @@ export interface AutocompleteSuggestion {
   content: string
   count?: number | null
 }
+
+export interface ScottyAttachment {
+  url: string | null
+  media_type?: string | null
+  caption?: string | null
+}
+
+export interface ScottyMetadata {
+  platform_session_id?: string | null
+  continuity_key?: string | null
+  agent_instance_id?: string | null
+  agent_definition_id?: string | null
+  routing_rule_id?: string | null
+  pipeline_definition_id?: string | null
+  pipeline_instance_id?: string | null
+}
+
+export interface ScottyChatResponse {
+  output: string | null
+  attachments: ScottyAttachment[]
+  metadata: ScottyMetadata | null
+}
+
+export interface ScottyCallResponse {
+  url: string | null
+  token: string | null
+  metadata: ScottyMetadata | null
+}
+
 
 

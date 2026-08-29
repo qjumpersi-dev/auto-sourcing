@@ -2,10 +2,13 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import type {
   AutocompleteSuggestion,
   Campaign,
+  EnrichedProfileSearchResponse,
   Lead,
   OutreachMessage,
+  PaginatedLeads,
   ProfileSearchRequest,
-  ProfileSearchResponse,
+  ScottyCallResponse,
+  ScottyChatResponse,
 } from '@/types/models'
 
 export const apiSlice = createApi({
@@ -13,11 +16,34 @@ export const apiSlice = createApi({
   baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
   tagTypes: ['Lead', 'Campaign', 'OutreachMessage'],
   endpoints: (builder) => ({
-    getLeads: builder.query<Lead[], void>({
-      query: () => '/leads',
+    getLeads: builder.query<
+      PaginatedLeads,
+      {
+        page: number
+        pageSize: number
+        campaignId?: number
+        sortBy?: string
+        sortOrder?: 'asc' | 'desc'
+        addedFrom?: string
+        addedTo?: string
+      } | void
+    >({
+      query: (args) => {
+        const page = args?.page ?? 1
+        const pageSize = args?.pageSize ?? 100
+        const params = new URLSearchParams()
+        params.set('page', String(page))
+        params.set('pageSize', String(pageSize))
+        if (args?.campaignId) params.set('campaignId', String(args.campaignId))
+        if (args?.sortBy) params.set('sortBy', args.sortBy)
+        if (args?.sortOrder) params.set('sortOrder', args.sortOrder)
+        if (args?.addedFrom) params.set('addedFrom', args.addedFrom)
+        if (args?.addedTo) params.set('addedTo', args.addedTo)
+        return `/leads?${params.toString()}`
+      },
       providesTags: ['Lead'],
     }),
-    searchRhetorik: builder.mutation<ProfileSearchResponse, ProfileSearchRequest>({
+    searchRhetorik: builder.mutation<EnrichedProfileSearchResponse, ProfileSearchRequest>({
       query: (request) => ({ url: '/leads/search-rhetorik', method: 'POST', body: request }),
     }),
     generateSearchSpec: builder.mutation<Partial<ProfileSearchRequest>, { text: string }>({
@@ -31,8 +57,19 @@ export const apiSlice = createApi({
       query: (request) => ({ url: '/leads/import', method: 'POST', body: request }),
       invalidatesTags: ['Lead'],
     }),
+    importToCampaign: builder.mutation<
+      { added: number; skipped: number },
+      { campaignId: number; profileIds: string[] }
+    >({
+      query: ({ campaignId, profileIds }) => ({
+        url: '/leads/import-to-campaign',
+        method: 'POST',
+        body: { campaignId, profileIds },
+      }),
+      invalidatesTags: ['Lead'],
+    }),
     updateLeadStatus: builder.mutation<void, { id: number; status: number }>({
-      query: ({ id, status }) => ({ url: `/leads/${id}/status`, method: 'PATCH', body: status }),
+      query: ({ id, status }) => ({ url: `/leads/${id}/status`, method: 'PATCH', body: { status } }),
       invalidatesTags: ['Lead'],
     }),
     getCampaigns: builder.query<Campaign[], void>({
@@ -90,6 +127,12 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['OutreachMessage', 'Lead'],
     }),
+    scottyChat: builder.mutation<ScottyChatResponse, { userPrompt: string; continuityKey?: string }>({
+      query: (body) => ({ url: '/scotty/chat', method: 'POST', body }),
+    }),
+    scottyCall: builder.mutation<ScottyCallResponse, { continuityKey?: string }>({
+      query: (body) => ({ url: '/scotty/call', method: 'POST', body }),
+    }),
   }),
 })
 
@@ -99,6 +142,7 @@ export const {
   useGenerateSearchSpecMutation,
   useLazyAutocompleteQuery,
   useImportFromRhetorikMutation,
+  useImportToCampaignMutation,
   useUpdateLeadStatusMutation,
   useGetCampaignsQuery,
   useGetCampaignQuery,
@@ -108,5 +152,7 @@ export const {
   useSendMessageMutation,
   useUpdateCampaignMutation,
   useAddLeadsToCampaignMutation,
+  useScottyChatMutation,
+  useScottyCallMutation,
 } = apiSlice
 
