@@ -136,15 +136,25 @@ public class RhetorikClient : IRhetorikClient
 
         return new Lead
         {
-            ExternalId = p.ProfileId ?? string.Empty,
-            FirstName = (p.FirstName ?? string.Empty).Trim(),
-            LastName = (p.LastName ?? string.Empty).Trim(),
+            ExternalId = Truncate(p.ProfileId ?? string.Empty, 100),
+            FirstName = Truncate((p.FirstName ?? string.Empty).Trim(), 100),
+            LastName = Truncate((p.LastName ?? string.Empty).Trim(), 100),
             Email = string.Empty,
-            Company = currentExperience?.RawCompanyName ?? currentExperience?.CompanyName,
-            JobTitle = currentExperience?.JobTitle ?? p.Headline ?? string.Empty,
+            Company = TruncateNullable(currentExperience?.RawCompanyName ?? currentExperience?.CompanyName, 200),
+            JobTitle = TruncateNullable(currentExperience?.JobTitle ?? p.Headline, 200),
             LinkedInUrl = null,
-            Source = $"Rhetorik:{ProfileSearchEndpoint}"
+            Source = Truncate($"Rhetorik:{ProfileSearchEndpoint}", 100)
         };
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        return value.Length <= maxLength ? value : value[..maxLength];
+    }
+
+    private static string? TruncateNullable(string? value, int maxLength)
+    {
+        return value is null ? null : Truncate(value, maxLength);
     }
 }
 

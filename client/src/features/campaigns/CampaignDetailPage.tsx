@@ -51,7 +51,7 @@ export function CampaignDetailPage({
 }) {
   const { data: campaign } = useGetCampaignQuery(campaignId)
   const { data: messages = [] } = useGetMessagesQuery(campaignId)
-  const { data: leads = [] } = useGetLeadsQuery()
+  const { data: leads = { items: [] } } = useGetLeadsQuery({ page: 1, pageSize: 100 })
   const [createDraft, { isLoading: creating }] = useCreateDraftMutation()
   const [sendMessage, { isLoading: sending }] = useSendMessageMutation()
   const [draftError, setDraftError] = useState<string | null>(null)
@@ -185,7 +185,7 @@ export function CampaignDetailPage({
               <Label htmlFor="leadId">Lead</Label>
               <Select {...register('leadId', { required: true })}>
                 <option value="">Select a leadÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</option>
-                {leads.map((lead) => (
+                {leads.items.map((lead) => (
                   <option key={lead.id} value={lead.id}>
                     {lead.firstName} {lead.lastName}
                     {lead.company ? ` - ${lead.company}` : ''}

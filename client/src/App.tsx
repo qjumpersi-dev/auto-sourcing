@@ -1,19 +1,22 @@
 import { useState } from 'react'
-import { Users, Megaphone } from 'lucide-react'
+import { UserCheck, Megaphone, Search } from 'lucide-react'
+import { SearchPage } from '@/features/leads/SearchPage'
 import { LeadsPage } from '@/features/leads/LeadsPage'
 import { CampaignsPage } from '@/features/campaigns/CampaignsPage'
 import { CampaignDetailPage } from '@/features/campaigns/CampaignDetailPage'
+import ScottyAssistant from '@/components/ScottyAssistant'
 import { cn } from '@/lib/utils'
 
-type View = { page: 'leads' | 'campaigns' } | { page: 'campaign-detail'; campaignId: number }
+type View = { page: 'search' | 'leads' | 'campaigns' } | { page: 'campaign-detail'; campaignId: number }
 
 const nav = [
-  { key: 'leads', label: 'Leads', icon: Users },
+  { key: 'search', label: 'Search', icon: Search },
+  { key: 'leads', label: 'Your Leads', icon: UserCheck },
   { key: 'campaigns', label: 'Campaigns', icon: Megaphone },
 ] as const
 
 function App() {
-  const [view, setView] = useState<View>({ page: 'leads' })
+  const [view, setView] = useState<View>({ page: 'search' })
 
   return (
     <div className="flex min-h-screen">
@@ -44,6 +47,7 @@ function App() {
 
       <main className="flex-1 p-8">
         <div className="mx-auto max-w-6xl">
+          {view.page === 'search' && <SearchPage />}
           {view.page === 'leads' && <LeadsPage />}
           {view.page === 'campaigns' && (
             <CampaignsPage onOpenCampaign={(campaignId) => setView({ page: 'campaign-detail', campaignId })} />
@@ -56,6 +60,8 @@ function App() {
           )}
         </div>
       </main>
+
+      <ScottyAssistant />
     </div>
   )
 }
