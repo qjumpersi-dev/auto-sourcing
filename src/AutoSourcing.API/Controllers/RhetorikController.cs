@@ -16,7 +16,7 @@ public class RhetorikController : ControllerBase
 {
     private static readonly string[] AllowedFields =
     [
-        "countries", "skill_names", "industries_names"
+        "countries", "states", "cities", "skill_names", "industries_names"
     ];
 
     private readonly IRhetorikClient _rhetorikClient;
