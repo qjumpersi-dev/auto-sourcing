@@ -334,11 +334,21 @@ export function SearchPage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="states">Region / State</Label>
-            <Input id="states" placeholder="Auckland" {...register('states')} />
+            <SuggestionInput
+              field="states"
+              value={getValues().states}
+              onChange={(v) => setValue('states', v)}
+              placeholder="Start typing a region or state..."
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="cities">City</Label>
-            <Input id="cities" placeholder="Wellington" {...register('cities')} />
+            <SuggestionInput
+              field="cities"
+              value={getValues().cities}
+              onChange={(v) => setValue('cities', v)}
+              placeholder="Start typing a city..."
+            />
           </div>
 
           <div className="flex items-center gap-3 md:col-span-3">

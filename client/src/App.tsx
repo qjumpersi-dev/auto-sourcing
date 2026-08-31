@@ -20,11 +20,15 @@ function App() {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-56 flex-col border-r bg-muted/40">
-        <div className="border-b px-5 py-5">
-          <p className="font-semibold">Auto Sourcing</p>
-          <p className="text-xs text-muted-foreground">Find leads. Reach out.</p>
-        </div>
+        <aside className="flex w-64 flex-col border-r bg-white">
+          <div className="border-b px-5 py-5">
+            <img
+              src="/qjumpers-logo.png"
+              alt="QJumpers"
+              className="h-8 w-auto"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">AI Sourcing & Recruiting</p>
+          </div>
         <nav className="flex flex-col gap-1 p-3">
           {nav.map(({ key, label, icon: Icon }) => (
             <button

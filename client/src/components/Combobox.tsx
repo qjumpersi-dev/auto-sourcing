@@ -10,7 +10,7 @@ export function SuggestionInput({
   placeholder,
   className,
 }: {
-  field: 'countries' | 'skill_names'
+  field: 'countries' | 'states' | 'cities' | 'skill_names'
   value?: string
   onChange: (value: string) => void
   placeholder?: string
