@@ -2,17 +2,19 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Loader2, Plus } from 'lucide-react'
 import { useCreateCampaignMutation, useGetCampaignsQuery } from '@/services/apiSlice'
-import { campaignStatusLabels } from '@/types/models'
+import { campaignStatusLabels, outreachChannelLabels } from '@/types/models'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
 interface CampaignFormValues {
   subjectTemplate?: string
   bodyTemplate?: string
+  channel?: string
   name: string
   description?: string
 }
@@ -31,7 +33,13 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
   const onSubmit = handleSubmit(async (values) => {
     setError(null)
     try {
-      await createCampaign(values).unwrap()
+      await createCampaign({
+        name: values.name,
+        description: values.description || undefined,
+        subjectTemplate: values.subjectTemplate || undefined,
+        bodyTemplate: values.bodyTemplate || undefined,
+        channel: Number(values.channel ?? 0),
+      }).unwrap()
       reset()
     } catch (e) {
       setError('Could not create the campaign. Please try again.')
@@ -66,6 +74,13 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
                 placeholder="What is this campaign about?"
                 {...register('description')}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="channel">Channel</Label>
+              <Select id="channel" defaultValue="0" {...register('channel')}>
+                <option value="0">{outreachChannelLabels[0]}</option>
+                <option value="3">{outreachChannelLabels[3]}</option>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="subjectTemplate">Subject template</Label>

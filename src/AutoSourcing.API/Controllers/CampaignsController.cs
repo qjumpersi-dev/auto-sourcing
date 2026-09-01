@@ -56,6 +56,7 @@ public class CampaignsController : ControllerBase
         campaign.Name = updated.Name;
         campaign.Description = updated.Description;
         campaign.Status = updated.Status;
+        campaign.Channel = updated.Channel;
         if (campaign.Status == Core.Enums.CampaignStatus.Active && campaign.StartedAt is null)
         {
             campaign.StartedAt = DateTime.UtcNow;

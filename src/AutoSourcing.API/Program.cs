@@ -1,5 +1,6 @@
 using AutoSourcing.Data;
 using AutoSourcing.Services.Email;
+using AutoSourcing.Services.LinkedIn;
 using AutoSourcing.Services.NLSearch;
 using AutoSourcing.Services.Outreach;
 using AutoSourcing.Services.Rhetorik;
@@ -29,6 +30,9 @@ builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailO
 builder.Services.AddSingleton<IEmailService, SmtpEmailService>();
 builder.Services.AddSingleton<IPersonalizationService, PersonalizationService>();
 builder.Services.AddScoped<IOutreachService, OutreachService>();
+
+builder.Services.Configure<LinkedInOptions>(builder.Configuration.GetSection(LinkedInOptions.SectionName));
+builder.Services.AddSingleton<ILinkedInService, PlaywrightLinkedInService>();
 
 var app = builder.Build();
 
