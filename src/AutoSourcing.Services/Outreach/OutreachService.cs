@@ -16,7 +16,7 @@ public class OutreachService : IOutreachService
         _personalization = personalization;
     }
 
-    public async Task<OutreachMessage> CreateDraftAsync(int leadId, int campaignId, string subjectTemplate, string bodyTemplate, CancellationToken cancellationToken = default)
+    public async Task<OutreachMessage> CreateDraftAsync(int leadId, int campaignId, string subjectTemplate, string bodyTemplate, OutreachChannel channel, CancellationToken cancellationToken = default)
     {
         var lead = await _dbContext.Leads.FindAsync([leadId], cancellationToken)
             ?? throw new InvalidOperationException($"Lead {leadId} not found.");
@@ -32,7 +32,7 @@ public class OutreachService : IOutreachService
             throw new InvalidOperationException($"Lead {leadId} has opted out of outreach.");
         }
 
-        var message = BuildDraft(lead, campaignId, subjectTemplate, bodyTemplate);
+        var message = BuildDraft(lead, campaignId, subjectTemplate, bodyTemplate, channel);
 
         _dbContext.OutreachMessages.Add(message);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -63,7 +63,7 @@ public class OutreachService : IOutreachService
                 continue;
             }
 
-            created.Add(BuildDraft(lead, campaignId, campaign.SubjectTemplate ?? string.Empty, campaign.BodyTemplate ?? string.Empty));
+            created.Add(BuildDraft(lead, campaignId, campaign.SubjectTemplate ?? string.Empty, campaign.BodyTemplate ?? string.Empty, campaign.Channel));
         }
 
         if (created.Count > 0)
@@ -75,11 +75,11 @@ public class OutreachService : IOutreachService
         return created;
     }
 
-    private OutreachMessage BuildDraft(Lead lead, int campaignId, string subjectTemplate, string bodyTemplate) => new()
+    private OutreachMessage BuildDraft(Lead lead, int campaignId, string subjectTemplate, string bodyTemplate, OutreachChannel channel) => new()
     {
         LeadId = lead.Id,
         CampaignId = campaignId,
-        Channel = OutreachChannel.Email,
+        Channel = channel,
         Subject = _personalization.RenderTemplate(subjectTemplate, lead),
         Body = _personalization.RenderTemplate(bodyTemplate, lead),
         Status = OutreachMessageStatus.Draft

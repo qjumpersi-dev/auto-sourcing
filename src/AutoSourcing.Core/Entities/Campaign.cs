@@ -9,6 +9,7 @@ public class Campaign
     public string? Description { get; set; }
     public string? SubjectTemplate { get; set; }
     public string? BodyTemplate { get; set; }
+    public OutreachChannel Channel { get; set; } = OutreachChannel.Email;
     public CampaignStatus Status { get; set; } = CampaignStatus.Draft;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? StartedAt { get; set; }

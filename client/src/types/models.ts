@@ -46,6 +46,7 @@ export interface Campaign {
   name: string
   description: string | null
   status: number
+  channel: number
   subjectTemplate?: string | null
   bodyTemplate?: string | null
   createdAt: string
@@ -60,6 +61,26 @@ export const campaignStatusLabels: Record<number, string> = {
   2: 'Paused',
   3: 'Completed',
   4: 'Cancelled',
+}
+
+export const OutreachChannel = {
+  Email: 0,
+  Sms: 1,
+  WhatsApp: 2,
+  LinkedIn: 3,
+} as const
+
+export const outreachChannelLabels: Record<number, string> = {
+  [OutreachChannel.Email]: 'Email',
+  [OutreachChannel.Sms]: 'SMS',
+  [OutreachChannel.WhatsApp]: 'WhatsApp',
+  [OutreachChannel.LinkedIn]: 'LinkedIn InMail',
+}
+
+export interface LinkedInStatus {
+  signedIn: boolean
+  dryRun: boolean
+  userDataDir: string
 }
 
 export interface OutreachMessage {

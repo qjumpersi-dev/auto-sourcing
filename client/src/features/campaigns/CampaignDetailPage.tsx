@@ -8,10 +8,14 @@ import {
   useGetLeadsQuery,
   useGetMessagesQuery,
   useSendMessageMutation,
+  useGetLinkedInStatusQuery,
+  useSignInToLinkedInMutation,
 } from '@/services/apiSlice'
 import {
   messageStatusLabels,
   OutreachMessageStatus,
+  outreachChannelLabels,
+  OutreachChannel,
 } from '@/types/models'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,6 +30,7 @@ interface DraftFormValues {
   leadId: string
   subjectTemplate: string
   bodyTemplate: string
+  channel: string
 }
 
 function messageVariant(status: number) {
@@ -52,10 +57,12 @@ export function CampaignDetailPage({
   const { data: campaign } = useGetCampaignQuery(campaignId)
   const { data: messages = [] } = useGetMessagesQuery(campaignId)
   const { data: leads = { items: [] } } = useGetLeadsQuery({ page: 1, pageSize: 100 })
+  const { data: linkedInStatus, refetch: refetchLinkedInStatus } = useGetLinkedInStatusQuery()
+  const [signInToLinkedIn, { isLoading: signingIn }] = useSignInToLinkedInMutation()
   const [createDraft, { isLoading: creating }] = useCreateDraftMutation()
   const [sendMessage, { isLoading: sending }] = useSendMessageMutation()
   const [draftError, setDraftError] = useState<string | null>(null)
-  const [templateState, setTemplateState] = useState<{ subject: string; body: string } | null>(null)
+  const [templateState, setTemplateState] = useState<{ subject: string; body: string; channel: number } | null>(null)
   const [savedTemplates, setSavedTemplates] = useState(false)
 
   const {
@@ -70,7 +77,11 @@ export function CampaignDetailPage({
   }, [campaignId])
   useEffect(() => {
     if (campaign && templateState === null) {
-      setTemplateState({ subject: campaign.subjectTemplate ?? '', body: campaign.bodyTemplate ?? '' })
+      setTemplateState({
+        subject: campaign.subjectTemplate ?? '',
+        body: campaign.bodyTemplate ?? '',
+        channel: campaign.channel ?? OutreachChannel.Email,
+      })
     }
   }, [campaign, templateState])
 
@@ -85,6 +96,7 @@ export function CampaignDetailPage({
         name: campaign.name,
         description: campaign.description ?? undefined,
         status: campaign.status,
+        channel: templateState.channel,
         subjectTemplate: templateState.subject,
         bodyTemplate: templateState.body,
       }).unwrap()
@@ -100,6 +112,7 @@ export function CampaignDetailPage({
       await createDraft({
         campaignId,
         leadId: Number(values.leadId),
+        channel: Number(values.channel),
         subjectTemplate: values.subjectTemplate,
         bodyTemplate: values.bodyTemplate,
       }).unwrap()
@@ -123,6 +136,34 @@ export function CampaignDetailPage({
         </div>
       </div>
 
+      {linkedInStatus && !linkedInStatus.signedIn && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <p className="font-medium text-destructive">LinkedIn InMail needs a signed-in session</p>
+          <p className="text-muted-foreground">
+            A Chromium window will open on the API machine. Log into LinkedIn in that window, then the app
+            picks up the session automatically.{' '}
+            {linkedInStatus.dryRun
+              ? 'Dry-run mode is on - messages will be prepared in the composer but not sent.'
+              : ''}
+          </p>
+          <div className="mt-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={signingIn}
+              onClick={async () => {
+                await signInToLinkedIn()
+                refetchLinkedInStatus()
+              }}
+            >
+              {signingIn ? <Loader2 className="animate-spin" /> : null}
+              Log in to LinkedIn
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Campaign templates</CardTitle>
@@ -134,6 +175,20 @@ export function CampaignDetailPage({
         <CardContent>
           {templateState && (
             <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="tplChannel">Channel</Label>
+                <Select
+                  id="tplChannel"
+                  value={String(templateState.channel)}
+                  onChange={(e) => {
+                    setTemplateState({ ...templateState, channel: Number(e.target.value) })
+                    setSavedTemplates(false)
+                  }}
+                >
+                  <option value={OutreachChannel.Email}>{outreachChannelLabels[OutreachChannel.Email]}</option>
+                  <option value={OutreachChannel.LinkedIn}>{outreachChannelLabels[OutreachChannel.LinkedIn]}</option>
+                </Select>
+              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="tplSubject">Subject template</Label>
                 <Input
@@ -195,6 +250,13 @@ export function CampaignDetailPage({
               {errors.leadId && <p className="text-xs text-destructive">Pick a lead.</p>}
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="draftChannel">Channel</Label>
+              <Select id="draftChannel" defaultValue="0" {...register('channel', { required: true })}>
+                <option value={OutreachChannel.Email}>{outreachChannelLabels[OutreachChannel.Email]}</option>
+                <option value={OutreachChannel.LinkedIn}>{outreachChannelLabels[OutreachChannel.LinkedIn]}</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="subject">Subject template</Label>
               <Input
                 id="subject"
@@ -234,6 +296,7 @@ export function CampaignDetailPage({
               <TableHeader>
                 <TableRow>
                   <TableHead>Lead</TableHead>
+                  <TableHead>Channel</TableHead>
                   <TableHead>Subject</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Sent</TableHead>
@@ -252,6 +315,11 @@ export function CampaignDetailPage({
                           {message.errorMessage}
                         </span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={message.channel === OutreachChannel.LinkedIn ? 'outline' : 'secondary'}>
+                        {outreachChannelLabels[message.channel] ?? message.channel}
+                      </Badge>
                     </TableCell>
                     <TableCell>{message.subject ?? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</TableCell>
                     <TableCell>

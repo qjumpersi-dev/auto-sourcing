@@ -2,6 +2,7 @@ using AutoSourcing.Core.Entities;
 using AutoSourcing.Core.Enums;
 using AutoSourcing.Data;
 using AutoSourcing.Services.Email;
+using AutoSourcing.Services.LinkedIn;
 using AutoSourcing.Services.Outreach;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,7 @@ public class CreateDraftRequest
     public int CampaignId { get; set; }
     public string SubjectTemplate { get; set; } = string.Empty;
     public string BodyTemplate { get; set; } = string.Empty;
+    public OutreachChannel Channel { get; set; } = OutreachChannel.Email;
 }
 
 [ApiController]
@@ -23,15 +25,18 @@ public class OutreachMessagesController : ControllerBase
     private readonly AutoSourcingDbContext _dbContext;
     private readonly IOutreachService _outreachService;
     private readonly IEmailService _emailService;
+    private readonly ILinkedInService _linkedInService;
 
     public OutreachMessagesController(
         AutoSourcingDbContext dbContext,
         IOutreachService outreachService,
-        IEmailService emailService)
+        IEmailService emailService,
+        ILinkedInService linkedInService)
     {
         _dbContext = dbContext;
         _outreachService = outreachService;
         _emailService = emailService;
+        _linkedInService = linkedInService;
     }
 
     [HttpGet]
@@ -77,8 +82,20 @@ public class OutreachMessagesController : ControllerBase
         try
         {
             var message = await _outreachService.CreateDraftAsync(
-                request.LeadId, campaignId, request.SubjectTemplate, request.BodyTemplate, cancellationToken);
-            return CreatedAtAction(nameof(GetMessages), new { campaignId }, message);
+                request.LeadId, campaignId, request.SubjectTemplate, request.BodyTemplate, request.Channel, cancellationToken);
+            return CreatedAtAction(nameof(GetMessages), new { campaignId }, new
+            {
+                message.Id,
+                message.LeadId,
+                message.CampaignId,
+                message.Channel,
+                message.Subject,
+                message.Body,
+                message.Status,
+                message.ErrorMessage,
+                message.CreatedAt,
+                message.SentAt
+            });
         }
         catch (InvalidOperationException ex)
         {
@@ -98,11 +115,6 @@ public class OutreachMessagesController : ControllerBase
             return NotFound();
         }
 
-        if (message.Channel != OutreachChannel.Email)
-        {
-            return BadRequest(new { error = "Only email sending is currently supported." });
-        }
-
         if (message.Lead.Status == LeadStatus.OptedOut)
         {
             return BadRequest(new { error = "Lead has opted out." });
@@ -110,7 +122,29 @@ public class OutreachMessagesController : ControllerBase
 
         try
         {
-            await _emailService.SendAsync(message.Lead.Email, message.Subject ?? "(no subject)", message.Body, cancellationToken);
+            switch (message.Channel)
+            {
+                case OutreachChannel.Email:
+                    await _emailService.SendAsync(message.Lead.Email, message.Subject ?? "(no subject)", message.Body, cancellationToken);
+                    break;
+
+                case OutreachChannel.LinkedIn:
+                    if (string.IsNullOrWhiteSpace(message.Lead.LinkedInUrl))
+                    {
+                        return BadRequest(new { error = "Lead has no LinkedIn URL." });
+                    }
+
+                    var result = await _linkedInService.SendInMailAsync(message.Lead.LinkedInUrl, message.Subject ?? string.Empty, message.Body, cancellationToken);
+                    if (!result.Sent)
+                    {
+                        return Ok(new { dryRun = true, message = result.Message });
+                    }
+                    break;
+
+                default:
+                    return BadRequest(new { error = "Sending via this channel is not yet supported." });
+            }
+
             message.Status = OutreachMessageStatus.Sent;
             message.SentAt = DateTime.UtcNow;
             message.ErrorMessage = null;
@@ -124,7 +158,7 @@ public class OutreachMessagesController : ControllerBase
         catch (Exception ex)
         {
             message.Status = OutreachMessageStatus.Failed;
-            message.ErrorMessage = ex.Message;
+            message.ErrorMessage = ex.Message.Length > 2000 ? ex.Message[..2000] : ex.Message;
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

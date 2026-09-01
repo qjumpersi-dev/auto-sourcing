@@ -4,6 +4,7 @@ import type {
   Campaign,
   EnrichedProfileSearchResponse,
   Lead,
+  LinkedInStatus,
   OutreachMessage,
   PaginatedLeads,
   ProfileSearchRequest,
@@ -80,13 +81,13 @@ export const apiSlice = createApi({
       query: (id) => `/campaigns/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Campaign', id }],
     }),
-    createCampaign: builder.mutation<Campaign, { name: string; description?: string; subjectTemplate?: string; bodyTemplate?: string }>({
+    createCampaign: builder.mutation<Campaign, { name: string; description?: string; subjectTemplate?: string; bodyTemplate?: string; channel?: number }>({
       query: (body) => ({ url: '/campaigns', method: 'POST', body }),
       invalidatesTags: ['Campaign'],
     }),
     updateCampaign: builder.mutation<
       void,
-      { id: number; name: string; description?: string; subjectTemplate?: string; bodyTemplate?: string; status: number }
+      { id: number; name: string; description?: string; subjectTemplate?: string; bodyTemplate?: string; status: number; channel?: number }
     >({
       query: ({ id, ...body }) => ({ url: `/campaigns/${id}`, method: 'PUT', body }),
       invalidatesTags: (_result, _error, arg) => ['Campaign', { type: 'Campaign', id: arg.id }],
@@ -111,7 +112,7 @@ export const apiSlice = createApi({
     }),
     createDraft: builder.mutation<
       OutreachMessage,
-      { campaignId: number; leadId: number; subjectTemplate: string; bodyTemplate: string }
+      { campaignId: number; leadId: number; subjectTemplate: string; bodyTemplate: string; channel: number }
     >({
       query: ({ campaignId, ...body }) => ({
         url: `/campaigns/${campaignId}/messages/drafts`,
@@ -126,6 +127,12 @@ export const apiSlice = createApi({
         method: 'POST',
       }),
       invalidatesTags: ['OutreachMessage', 'Lead'],
+    }),
+    getLinkedInStatus: builder.query<LinkedInStatus, void>({
+      query: () => '/linkedin/status',
+    }),
+    signInToLinkedIn: builder.mutation<{ signedIn: boolean }, void>({
+      query: () => ({ url: '/linkedin/sign-in', method: 'POST' }),
     }),
     scottyChat: builder.mutation<ScottyChatResponse, { userPrompt: string; continuityKey?: string }>({
       query: (body) => ({ url: '/scotty/chat', method: 'POST', body }),
@@ -154,5 +161,7 @@ export const {
   useAddLeadsToCampaignMutation,
   useScottyChatMutation,
   useScottyCallMutation,
+  useGetLinkedInStatusQuery,
+  useSignInToLinkedInMutation,
 } = apiSlice
 
