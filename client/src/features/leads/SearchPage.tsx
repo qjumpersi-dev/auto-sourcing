@@ -150,7 +150,7 @@ export function SearchPage() {
       setLastRequest(request)
       setResults(response)
     } catch {
-      setSearchError('The search failed. Rhetorik may be having issues - try again or simplify the filters.')
+      setSearchError('The search failed. Try again or simplify the filters.')
     }
   })
 
@@ -238,7 +238,7 @@ export function SearchPage() {
       <CardHeader>
         <CardTitle>Find candidates</CardTitle>
         <CardDescription>
-          Searches Rhetorik360 profiles. Every search automatically includes the "Profile Has Email"
+          Searches candidate profiles. Every search automatically includes the "Profile Has Email"
           tag. Up to 500 profiles are shown per search.
         </CardDescription>
       </CardHeader>
