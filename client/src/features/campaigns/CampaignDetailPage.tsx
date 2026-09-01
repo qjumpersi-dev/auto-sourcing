@@ -60,8 +60,10 @@ export function CampaignDetailPage({
   const { data: linkedInStatus, refetch: refetchLinkedInStatus } = useGetLinkedInStatusQuery()
   const [signInToLinkedIn, { isLoading: signingIn }] = useSignInToLinkedInMutation()
   const [createDraft, { isLoading: creating }] = useCreateDraftMutation()
-  const [sendMessage, { isLoading: sending }] = useSendMessageMutation()
+  const [sendMessage] = useSendMessageMutation()
   const [draftError, setDraftError] = useState<string | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
+  const [sendingId, setSendingId] = useState<number | null>(null)
   const [templateState, setTemplateState] = useState<{ subject: string; body: string; channel: number } | null>(null)
   const [savedTemplates, setSavedTemplates] = useState(false)
 
@@ -121,6 +123,19 @@ export function CampaignDetailPage({
       setDraftError('Could not create the draft.')
     }
   })
+
+  const onSend = async (messageId: number) => {
+    setSendError(null)
+    setSendingId(messageId)
+    try {
+      await sendMessage({ campaignId, messageId }).unwrap()
+    } catch (e) {
+      const data = (e as { data?: { error?: string } })?.data
+      setSendError(data?.error ?? 'Could not send the message. Check the API is running and LinkedIn is signed in.')
+    } finally {
+      setSendingId(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -289,6 +304,11 @@ export function CampaignDetailPage({
           <CardDescription>Draft, send and track outreach per lead.</CardDescription>
         </CardHeader>
         <CardContent>
+          {sendError && (
+            <p className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {sendError}
+            </p>
+          )}
           {messages.length === 0 ? (
             <p className="text-sm text-muted-foreground">No messages yet.</p>
           ) : (
@@ -338,12 +358,10 @@ export function CampaignDetailPage({
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={sending}
-                          onClick={() =>
-                            sendMessage({ campaignId, messageId: message.id })
-                          }
+                          disabled={sendingId !== null}
+                          onClick={() => onSend(message.id)}
                         >
-                          {sending ? (
+                          {sendingId === message.id ? (
                             <Loader2 className="animate-spin" />
                           ) : (
                             <Send />
