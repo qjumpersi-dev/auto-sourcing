@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { AlertCircle, Download, Loader2, MailPlus, Search, Sparkles } from 'lucide-react'
+import { AlertCircle, Briefcase, Download, Loader2, MailPlus, RotateCcw, Search, Sparkles } from 'lucide-react'
 import {
   useGetCampaignsQuery,
   useGenerateSearchSpecMutation,
+  useGenerateJobSearchMutation,
+  useGetJobsQuery,
   useImportFromRhetorikMutation,
   useImportToCampaignMutation,
   useSearchRhetorikMutation,
@@ -65,6 +67,8 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
   const [importFromRhetorik, { isLoading: importing }] = useImportFromRhetorikMutation()
   const [importToCampaign, { isLoading: addingToCampaign }] = useImportToCampaignMutation()
   const { data: campaigns = [] } = useGetCampaignsQuery()
+  const { data: jobs = [] } = useGetJobsQuery()
+  const [generateJobSearch, { isLoading: loadingJobSearch }] = useGenerateJobSearchMutation()
 
   const [results, setResults] = useState<EnrichedProfileSearchResponse | null>(null)
   const [lastRequest, setLastRequest] = useState<ProfileSearchRequest | null>(null)
@@ -75,8 +79,9 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
   const [jobTitleSuggestions, setJobTitleSuggestions] = useState<string[]>([])
   const [profileLead, setProfileLead] = useState<Lead | null>(null)
   const [rhetorikFallback, setRhetorikFallback] = useState<any>(null)
+  const [selectedJobId, setSelectedJobId] = useState('')
 
-  const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<SearchFormValues>({
+  const { register, handleSubmit, getValues, setValue, reset, formState: { errors } } = useForm<SearchFormValues>({
     defaultValues: {
       freeText: '',
       keywords: '',
@@ -155,6 +160,35 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
       setJobTitleSuggestions(spec.jobTitleSuggestions ?? [])
     } catch {
       setSearchError('Could not auto-build the search. Fill the fields manually.')
+    }
+  }
+
+  const onReset = () => {
+    reset()
+    setResults(null)
+    setLastRequest(null)
+    setSearchError(null)
+    setSelectedResultIds(new Set())
+    setJobTitleSuggestions([])
+    setAddFeedback(null)
+    setSelectedJobId('')
+  }
+
+  const onJobSelect = async (jobId: string) => {
+    setSelectedJobId(jobId)
+    if (!jobId) return
+    setSearchError(null)
+    try {
+      const spec = await generateJobSearch(Number(jobId)).unwrap()
+      setValue('jobTitles', (spec.jobTitles ?? []).join(', '))
+      setValue('keywords', (spec.keywords ?? []).join(', '))
+      setValue('expertises', (spec.expertises ?? []).join(', '))
+      if (spec.expertiseMode) setValue('expertiseMode', spec.expertiseMode)
+      setValue('country', (spec.countries ?? []).join(', '))
+      setValue('states', (spec.states ?? []).join(', '))
+      setValue('cities', (spec.cities ?? []).join(', '))
+    } catch {
+      setSearchError('Could not load the job search criteria.')
     }
   }
 
@@ -287,6 +321,34 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
           </div>
         </div>
 
+        <div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="jobSelect" className="flex items-center gap-1.5">
+              <Briefcase className="h-3.5 w-3.5" />
+              Autofill from a job
+            </Label>
+            <Select
+              id="jobSelect"
+              className="w-80"
+              value={selectedJobId}
+              onChange={(e) => onJobSelect(e.target.value)}
+              disabled={loadingJobSearch}
+            >
+              <option value="">Choose a job...</option>
+              {jobs.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.title}
+                  {job.location ? ` — ${job.location}` : ''}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {loadingJobSearch && <Loader2 className="mb-2 h-4 w-4 animate-spin text-muted-foreground" />}
+          <span className="mb-2 text-xs text-muted-foreground">
+            Loads the job's criteria into the fields below — review and edit before searching.
+          </span>
+        </div>
+
         <form onSubmit={onSearch} className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="keywords">Keywords</Label>
@@ -384,6 +446,10 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
             <Button type="submit" disabled={searching}>
               {searching ? <Loader2 className="animate-spin" /> : <Search />}
               Search profiles
+            </Button>
+            <Button type="button" variant="outline" onClick={onReset} disabled={searching}>
+              <RotateCcw />
+              Reset
             </Button>
             <Badge variant="secondary">Must have email: always on</Badge>
           </div>
