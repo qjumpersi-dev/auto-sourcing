@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { BarChart3, Loader2, Users } from 'lucide-react'
-import { useGetCampaignsQuery } from '@/services/apiSlice'
+import {
+  useGetCampaignReportCandidatesQuery,
+  useGetCampaignReportQuery,
+  useGetCampaignsQuery,
+} from '@/services/apiSlice'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,74 +13,29 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate } from '@/lib/formatDate'
 
-interface StepReport {
-  stepNumber: number
-  stepName: string
-  channel: string
-  sent: number
-  delivered: number
-  opened: number
-  clicked: number
-  replied: number
-  failed: number
-  bounced: number
-}
-
-interface CampaignReportSummary {
-  campaignId: number
-  campaignName: string
-  sequenceName: string | null
-  totalCandidates: number
-  steps: StepReport[]
-}
-
-interface CandidateReportRow {
-  leadId: number
-  candidateName: string
-  email: string
-  phone: string | null
-  campaignName: string
-  sequenceName: string | null
-  addedBy: string | null
-  addedAt: string | null
-  currentStage: string
-  daysInStage: number
-  engagementStatus: string
-  lastContact: string | null
-  lastReply: string | null
-  nextAction: string
-  nextActionAt: string | null
-  emailStatus: string
-  smsStatus: string
-  optOut: boolean
-  goalAchieved: boolean
-  humanAttention: boolean
-}
-
 export function ReportsPage() {
   const { data: campaigns = [] } = useGetCampaignsQuery()
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('')
-  const [summary, setSummary] = useState<CampaignReportSummary | null>(null)
-  const [candidates, setCandidates] = useState<CandidateReportRow[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [reportCampaignId, setReportCampaignId] = useState<number | null>(null)
 
-  const loadReport = async () => {
+  const {
+    data: summary,
+    isFetching: summaryLoading,
+    isError: summaryError,
+  } = useGetCampaignReportQuery(reportCampaignId ?? 0, { skip: reportCampaignId === null })
+  const {
+    data: candidatesReport,
+    isFetching: candidatesLoading,
+    isError: candidatesError,
+  } = useGetCampaignReportCandidatesQuery(reportCampaignId ?? 0, { skip: reportCampaignId === null })
+
+  const loading = summaryLoading || candidatesLoading
+  const error = summaryError || candidatesError ? 'Could not load the report.' : null
+  const candidates = candidatesReport?.candidates ?? []
+
+  const loadReport = () => {
     if (!selectedCampaignId) return
-    setLoading(true)
-    setError(null)
-    try {
-      const [summaryRes, candidatesRes] = await Promise.all([
-        fetch(`/api/reports/campaign/${selectedCampaignId}`).then((r) => r.json()),
-        fetch(`/api/reports/campaign/${selectedCampaignId}/candidates`).then((r) => r.json()),
-      ])
-      setSummary(summaryRes)
-      setCandidates(candidatesRes.candidates ?? [])
-    } catch {
-      setError('Could not load the report.')
-    } finally {
-      setLoading(false)
-    }
+    setReportCampaignId(Number(selectedCampaignId))
   }
 
   return (

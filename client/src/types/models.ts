@@ -558,6 +558,56 @@ export interface SequencePreview {
   body: string
 }
 
+export interface ReportStep {
+  stepNumber: number
+  stepName: string
+  channel: string
+  sent: number
+  delivered: number
+  opened: number
+  clicked: number
+  replied: number
+  failed: number
+  bounced: number
+}
+
+export interface CampaignReportSummary {
+  campaignId: number
+  campaignName: string
+  sequenceName: string | null
+  totalCandidates: number
+  steps: ReportStep[]
+}
+
+export interface CandidateReportRow {
+  leadId: number
+  candidateName: string
+  email: string
+  phone: string | null
+  campaignName: string
+  sequenceName: string | null
+  addedBy: string | null
+  addedAt: string | null
+  currentStage: string
+  daysInStage: number
+  engagementStatus: string
+  lastContact: string | null
+  lastReply: string | null
+  nextAction: string
+  nextActionAt: string | null
+  emailStatus: string
+  smsStatus: string
+  optOut: boolean
+  goalAchieved: boolean
+  humanAttention: boolean
+}
+
+export interface CandidateReportResponse {
+  campaignId: number
+  campaignName: string
+  candidates: CandidateReportRow[]
+}
+
 export const weekDays = [
   { bit: 1, label: 'Sun' },
   { bit: 2, label: 'Mon' },

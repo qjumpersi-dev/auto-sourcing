@@ -2,6 +2,8 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import type {
   AutocompleteSuggestion,
   Campaign,
+  CampaignReportSummary,
+  CandidateReportResponse,
   EnrichedProfileSearchResponse,
   GeneratedContent,
   GenerateContentRequest,
@@ -175,6 +177,12 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['OutreachMessage'],
     }),
+    getCampaignReport: builder.query<CampaignReportSummary, number>({
+      query: (campaignId) => `/reports/campaign/${campaignId}`,
+    }),
+    getCampaignReportCandidates: builder.query<CandidateReportResponse, number>({
+      query: (campaignId) => `/reports/campaign/${campaignId}/candidates`,
+    }),
     getSequences: builder.query<Sequence[], void>({
       query: () => '/sequences',
       providesTags: ['Sequence'],
@@ -298,6 +306,8 @@ export const {
   useGetCampaignQuery,
   useCreateCampaignMutation,
   useGetMessagesQuery,
+  useGetCampaignReportQuery,
+  useGetCampaignReportCandidatesQuery,
   useCreateDraftMutation,
   useSendMessageMutation,
   useUpdateCampaignMutation,
