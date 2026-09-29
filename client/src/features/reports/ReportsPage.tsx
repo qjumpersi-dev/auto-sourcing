@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { formatDate } from '@/lib/formatDate'
 
 interface StepReport {
   stepNumber: number
@@ -50,11 +51,6 @@ interface CandidateReportRow {
   optOut: boolean
   goalAchieved: boolean
   humanAttention: boolean
-}
-
-function fmtDate(value: string | null): string {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString()
 }
 
 export function ReportsPage() {
@@ -234,8 +230,8 @@ export function ReportsPage() {
                         {row.engagementStatus}
                       </Badge>
                     </TableCell>
-                    <TableCell>{fmtDate(row.lastContact)}</TableCell>
-                    <TableCell>{fmtDate(row.lastReply)}</TableCell>
+                    <TableCell>{formatDate(row.lastContact)}</TableCell>
+                    <TableCell>{formatDate(row.lastReply)}</TableCell>
                     <TableCell>{row.nextAction}</TableCell>
                     <TableCell>{row.emailStatus}</TableCell>
                     <TableCell>{row.smsStatus}</TableCell>

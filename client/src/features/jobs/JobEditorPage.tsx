@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { formatDate } from '@/lib/formatDate'
 
 function emptyDraft(): JobInput {
   return {
@@ -513,8 +514,8 @@ export function JobEditorPage({
                 <div><dt className="font-medium">Type:</dt><dd>{jobTypeLabels[draft.type ?? 0]}</dd></div>
                 <div><dt className="font-medium">Flexibility:</dt><dd>{flexibilityLabels[draft.flexibility ?? 0]}</dd></div>
                 <div><dt className="font-medium">Salary:</dt><dd>{salaryTypeLabels[draft.salaryType ?? 3]}{draft.salaryFrom ? ` $${draft.salaryFrom}` : ''}{draft.salaryTo ? ` - $${draft.salaryTo}` : ''}{draft.salaryNotes ? ` (${draft.salaryNotes})` : ''}</dd></div>
-                <div><dt className="font-medium">Start date:</dt><dd>{draft.startDate || '—'}</dd></div>
-                <div><dt className="font-medium">Expiry date:</dt><dd>{draft.expiryDate || '—'}</dd></div>
+                <div><dt className="font-medium">Start date:</dt><dd>{formatDate(draft.startDate)}</dd></div>
+                <div><dt className="font-medium">Expiry date:</dt><dd>{formatDate(draft.expiryDate)}</dd></div>
                 <div><dt className="font-medium">Hiring manager:</dt><dd>{draft.hiringManager || '—'}</dd></div>
                 <div><dt className="font-medium">Department:</dt><dd>{draft.department || '—'}</dd></div>
                 <div><dt className="font-medium">Status:</dt><dd>{jobStatusLabels[draft.status ?? 0]}</dd></div>

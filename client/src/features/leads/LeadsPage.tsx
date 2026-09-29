@@ -16,17 +16,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { formatDate } from '@/lib/formatDate'
 
 const PAGE_SIZE = 100
 
 type SortKey = 'name' | 'email' | 'company' | 'jobtitle' | 'status' | 'dateadded' | 'campaigns'
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return '-'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleDateString()
-}
 
 export function LeadsPage() {
   const [leadPage, setLeadPage] = useState(1)

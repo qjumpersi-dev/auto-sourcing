@@ -11,19 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { LeadEditModal } from './LeadEditModal'
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-// Formats an ISO-ish date (e.g. "2005-12-01 00:00:00") as dd-mmm-yyyy.
-function formatProfileDate(value: string | null | undefined): string {
-  if (!value) return '—'
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
-  if (!match) return value
-  const [, year, month, day] = match
-  const monthIndex = Number(month) - 1
-  if (monthIndex < 0 || monthIndex > 11) return value
-  return `${day}-${MONTHS[monthIndex]}-${year}`
-}
+import { formatDate } from '@/lib/formatDate'
 
 interface RhetorikFallback {
   headline?: string | null
@@ -80,8 +68,8 @@ export function LeadProfileModal({
     const school = e.school ? ` at ${e.school}` : ''
     let dates = ''
     if (e.startDate || e.endDate) {
-      const start = e.startDate ? formatProfileDate(e.startDate) : '?'
-      const end = e.endDate ? formatProfileDate(e.endDate) : 'Current'
+      const start = e.startDate ? formatDate(e.startDate) : '?'
+      const end = e.endDate ? formatDate(e.endDate) : 'Current'
       dates = ` (${start} – ${end})`
     }
     return `${degree}${specialization}${school}${dates}`.trim() || '—'
@@ -216,7 +204,7 @@ export function LeadProfileModal({
                         <p className="font-medium">{exp.company}</p>
                         <p className="text-sm text-muted-foreground">{exp.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatProfileDate(exp.startDate)} – {exp.current ? 'Current' : formatProfileDate(exp.endDate)}
+                          {formatDate(exp.startDate)} – {exp.current ? 'Current' : formatDate(exp.endDate)}
                         </p>
                       </div>
                     </div>

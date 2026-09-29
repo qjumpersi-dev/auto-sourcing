@@ -40,6 +40,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { formatDate, formatDateTime } from '@/lib/formatDate'
 
 function messageVariant(status: number) {
   switch (status) {
@@ -53,10 +54,6 @@ function messageVariant(status: number) {
     default:
       return 'secondary'
   }
-}
-
-function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleString() : null
 }
 
 export function CampaignDetailPage({
@@ -443,7 +440,7 @@ export function CampaignDetailPage({
                         {messageStatusLabels[message.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatDate(message.sentAt) ?? '—'}</TableCell>
+                    <TableCell>{formatDateTime(message.sentAt)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         {(message.status === OutreachMessageStatus.Draft ||
@@ -505,9 +502,9 @@ function TrackingCell({ value }: { value: string | null }) {
     return <span className="text-muted-foreground">—</span>
   }
   return (
-    <span className="inline-flex items-center gap-1 text-emerald-600" title={new Date(value).toLocaleString()}>
+    <span className="inline-flex items-center gap-1 text-emerald-600" title={formatDateTime(value)}>
       <Check className="h-4 w-4" />
-      <span className="text-xs text-muted-foreground">{new Date(value).toLocaleDateString()}</span>
+      <span className="text-xs text-muted-foreground">{formatDate(value)}</span>
     </span>
   )
 }
