@@ -95,6 +95,8 @@ export interface LinkedInStatus {
   signedIn: boolean
   dryRun: boolean
   userDataDir: string
+  available?: boolean
+  error?: string | null
 }
 
 export interface OutreachMessage {

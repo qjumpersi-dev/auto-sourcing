@@ -247,7 +247,14 @@ export function CampaignDetailPage({
         </p>
       )}
 
-      {linkedInStatus && !linkedInStatus.signedIn && (
+      {linkedInStatus && !linkedInStatus.signedIn && linkedInStatus.available === false && (
+        <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          LinkedIn InMail automation is not available in this environment, so LinkedIn steps will be
+          skipped or marked as failed. Email and SMS outreach still work.
+        </div>
+      )}
+
+      {linkedInStatus && !linkedInStatus.signedIn && linkedInStatus.available !== false && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
           <p className="font-medium text-destructive">LinkedIn InMail needs a signed-in session</p>
           <p className="text-muted-foreground">

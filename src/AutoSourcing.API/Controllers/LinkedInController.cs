@@ -10,23 +10,41 @@ public class LinkedInController : ControllerBase
 {
     private readonly ILinkedInService _linkedInService;
     private readonly LinkedInOptions _options;
+    private readonly ILogger<LinkedInController> _logger;
 
-    public LinkedInController(ILinkedInService linkedInService, IOptions<LinkedInOptions> options)
+    public LinkedInController(ILinkedInService linkedInService, IOptions<LinkedInOptions> options, ILogger<LinkedInController> logger)
     {
         _linkedInService = linkedInService;
         _options = options.Value;
+        _logger = logger;
     }
 
     [HttpGet("status")]
     public async Task<ActionResult> GetStatus(CancellationToken cancellationToken)
     {
-        var signedIn = await _linkedInService.IsSignedInAsync(cancellationToken);
-        return Ok(new
+        try
         {
-            signedIn,
-            dryRun = _options.DryRun,
-            userDataDir = _options.UserDataDir
-        });
+            var signedIn = await _linkedInService.IsSignedInAsync(cancellationToken);
+            return Ok(new
+            {
+                signedIn,
+                dryRun = _options.DryRun,
+                userDataDir = _options.UserDataDir,
+                available = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "LinkedIn automation is not available in this environment.");
+            return Ok(new
+            {
+                signedIn = false,
+                dryRun = _options.DryRun,
+                userDataDir = _options.UserDataDir,
+                available = false,
+                error = "LinkedIn automation is not available in this environment."
+            });
+        }
     }
 
     [HttpPost("sign-in")]
