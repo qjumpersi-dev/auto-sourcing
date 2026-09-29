@@ -11,4 +11,6 @@ public class EmailOptions
     public string FromAddress { get; set; } = string.Empty;
     public string FromName { get; set; } = string.Empty;
     public bool EnableSsl { get; set; } = true;
+    public string PublicBaseUrl { get; set; } = "http://localhost:5000";
+    public int TimeoutMs { get; set; } = 30000;
 }

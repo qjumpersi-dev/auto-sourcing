@@ -14,6 +14,10 @@ public class OutreachMessage
     public string Body { get; set; } = string.Empty;
     public OutreachMessageStatus Status { get; set; } = OutreachMessageStatus.Draft;
     public string? ErrorMessage { get; set; }
+    public int? StepOrder { get; set; }
+    public DateTime? OpenedAt { get; set; }
+    public DateTime? ClickedAt { get; set; }
+    public DateTime? RepliedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? SentAt { get; set; }
 }

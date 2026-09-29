@@ -24,13 +24,27 @@ public class LeadDto
     public string? Phone { get; set; }
     public string? Company { get; set; }
     public string? JobTitle { get; set; }
+    public string? Location { get; set; }
     public string? LinkedInUrl { get; set; }
     public string Source { get; set; } = string.Empty;
     public string? ExternalId { get; set; }
     public LeadStatus Status { get; set; }
+    public ConsentChannel? PreferredChannel { get; set; }
+    public string? Country { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public List<CampaignRef> Campaigns { get; set; } = [];
+    public List<LeadEmailDto> Emails { get; set; } = [];
+}
+
+public class LeadEmailDto
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public bool IsVerified { get; set; }
+    public bool IsPrimary { get; set; }
+    public int Priority { get; set; }
 }
 
 public class PaginatedLeads
@@ -63,6 +77,9 @@ public class RhetorikProfileResultEnriched
 
     [JsonPropertyName("contact_data")]
     public RhetorikContactDataBlock? ContactData { get; set; }
+
+    [JsonPropertyName("resume_data")]
+    public RhetorikResumeData? ResumeData { get; set; }
 
     [JsonPropertyName("lead_id")]
     public int? LeadId { get; set; }
@@ -98,6 +115,24 @@ public class ImportToCampaignResponse
 public class UpdateLeadStatusRequest
 {
     public LeadStatus Status { get; set; }
+}
+
+public class UpdateLeadRequest
+{
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public string? LinkedInUrl { get; set; }
+    public string? Company { get; set; }
+    public string? JobTitle { get; set; }
+    public string? Location { get; set; }
+    public string? Country { get; set; }
+}
+
+public class RefreshLeadsRequest
+{
+    public List<int> LeadIds { get; set; } = [];
 }
 
 [ApiController]
@@ -178,6 +213,28 @@ public class LeadsController : ControllerBase
                     .OrderBy(c => c.Name)
                     .ToList());
 
+        var emailRows = leadIds.Count == 0
+            ? new List<LeadEmail>()
+            : await _dbContext.LeadEmails
+                .Where(e => leadIds.Contains(e.LeadId))
+                .OrderBy(e => e.Priority)
+                .ThenBy(e => e.Id)
+                .ToListAsync(cancellationToken);
+
+        var emailsByLead = emailRows
+            .GroupBy(e => e.LeadId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(e => new LeadEmailDto
+                {
+                    Id = e.Id,
+                    Email = e.Email,
+                    Type = e.Type,
+                    IsVerified = e.IsVerified,
+                    IsPrimary = e.IsPrimary,
+                    Priority = e.Priority
+                }).ToList());
+
         var items = leads.Select(l => new LeadDto
         {
             Id = l.Id,
@@ -187,13 +244,17 @@ public class LeadsController : ControllerBase
             Phone = l.Phone,
             Company = l.Company,
             JobTitle = l.JobTitle,
+            Location = l.Location,
             LinkedInUrl = l.LinkedInUrl,
             Source = l.Source,
             ExternalId = l.ExternalId,
             Status = l.Status,
+            PreferredChannel = l.PreferredChannel,
+            Country = l.Country,
             CreatedAt = l.CreatedAt,
             UpdatedAt = l.UpdatedAt,
             Campaigns = campaignsByLead.GetValueOrDefault(l.Id) ?? new List<CampaignRef>(),
+            Emails = emailsByLead.GetValueOrDefault(l.Id) ?? new List<LeadEmailDto>(),
         }).ToList();
 
         var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
@@ -213,6 +274,13 @@ public class LeadsController : ControllerBase
     {
         var lead = await _dbContext.Leads.AsNoTracking().FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
         return lead is null ? NotFound() : Ok(lead);
+    }
+
+    [HttpGet("{id:int}/profile")]
+    public async Task<ActionResult<LeadProfile>> GetLeadProfile(int id, CancellationToken cancellationToken)
+    {
+        var profile = await _dbContext.LeadProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.LeadId == id, cancellationToken);
+        return profile is null ? NotFound() : Ok(profile);
     }
 
     [HttpPost("search-rhetorik")]
@@ -261,6 +329,7 @@ public class LeadsController : ControllerBase
                 Position = r.Position,
                 ProfileData = r.ProfileData,
                 ContactData = r.ContactData,
+                ResumeData = r.ResumeData,
                 LeadId = leadId,
                 Campaigns = campaigns
             };
@@ -414,7 +483,86 @@ public class LeadsController : ControllerBase
         return Ok(new ImportToCampaignResponse { Added = created.Count, Skipped = skipped });
     }
 
-    [HttpPatch("{id:int}/status")]
+    [HttpPost("refresh")]
+    public async Task<ActionResult> RefreshLeads([FromBody] RefreshLeadsRequest request, CancellationToken cancellationToken)
+    {
+        if (request.LeadIds.Count == 0)
+        {
+            return BadRequest(new { error = "No leads selected." });
+        }
+
+        var leads = await _dbContext.Leads
+            .Include(l => l.Profile)
+            .Where(l => request.LeadIds.Contains(l.Id))
+            .ToListAsync(cancellationToken);
+
+        if (leads.Count == 0)
+        {
+            return NotFound();
+        }
+
+        var externalIds = leads
+            .Where(l => !string.IsNullOrEmpty(l.ExternalId))
+            .Select(l => l.ExternalId!)
+            .ToList();
+
+        if (externalIds.Count == 0)
+        {
+            return Ok(new { updated = 0, message = "No leads have Rhetorik profile IDs." });
+        }
+
+        var searchRequest = new ProfileSearchRequest { ProfileIds = externalIds };
+        var results = await _rhetorikClient.SearchProfilesAsync(searchRequest, cancellationToken);
+
+        var updated = 0;
+        foreach (var result in results.Results)
+        {
+            var profileId = result.ProfileData?.ProfileId;
+            if (string.IsNullOrEmpty(profileId)) continue;
+
+            var lead = leads.FirstOrDefault(l => l.ExternalId == profileId);
+            if (lead is null) continue;
+
+            var p = result.ProfileData!;
+            var currentExp = result.ContactData?.CurrentExperiences?
+                .FirstOrDefault(e => e.Current == true) ?? result.ContactData?.CurrentExperiences?.FirstOrDefault();
+
+            // Only update profile data from Rhetorik — do NOT overwrite manually added contact details
+            lead.Company = TruncateNullable(currentExp?.RawCompanyName ?? currentExp?.CompanyName, 200) ?? lead.Company;
+            lead.JobTitle = TruncateNullable(currentExp?.JobTitle ?? p.Headline, 200) ?? lead.JobTitle;
+            lead.Location = TruncateNullable(BuildLocation(p.Address), 200) ?? lead.Location;
+            lead.UpdatedAt = DateTime.UtcNow;
+
+            var workExp = result.ResumeData?.Experiences?
+                .Select(e => new { company = e.RawCompanyName ?? e.CompanyName, title = e.JobTitle, current = e.Current ?? false, startDate = e.StartDate, endDate = e.EndDate })
+                .ToList();
+
+            var education = result.ResumeData?.Educations?
+                .Select(e => new { school = e.EducationalEstablishment, degree = e.Diploma, specialization = e.Specialization, startDate = e.StartDate, endDate = e.EndDate })
+                .ToList();
+
+            if (lead.Profile is null)
+            {
+                lead.Profile = new LeadProfile { LeadId = lead.Id };
+                _dbContext.LeadProfiles.Add(lead.Profile);
+            }
+
+            lead.Profile.Headline = TruncateNullable(p.Headline, 500) ?? lead.Profile.Headline;
+            lead.Profile.Summary = p.Summary ?? lead.Profile.Summary;
+            lead.Profile.SelfReportedSkills = p.Expertises is { Count: > 0 } ? string.Join(", ", p.Expertises) : lead.Profile.SelfReportedSkills;
+            lead.Profile.WorkExperience = workExp is { Count: > 0 } ? System.Text.Json.JsonSerializer.Serialize(workExp) : lead.Profile.WorkExperience;
+            lead.Profile.Education = education is { Count: > 0 } ? System.Text.Json.JsonSerializer.Serialize(education) : lead.Profile.Education;
+            lead.Profile.Certifications = result.ResumeData?.Certifications?.Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n)).ToList() is { Count: > 0 } certs
+                ? string.Join(", ", certs) : lead.Profile.Certifications;
+            lead.Profile.Languages = p.Languages is { Count: > 0 } langs
+                ? string.Join(", ", langs) : lead.Profile.Languages;
+
+            updated++;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(new { updated });
+    }
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateLeadStatusRequest request, CancellationToken cancellationToken)
     {
         var lead = await _dbContext.Leads.FindAsync([id], cancellationToken);
@@ -427,6 +575,69 @@ public class LeadsController : ControllerBase
         lead.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<LeadDto>> UpdateLead(int id, [FromBody] UpdateLeadRequest request, CancellationToken cancellationToken)
+    {
+        var lead = await _dbContext.Leads.FindAsync([id], cancellationToken);
+        if (lead is null)
+        {
+            return NotFound();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FirstName)) lead.FirstName = request.FirstName;
+        if (!string.IsNullOrWhiteSpace(request.LastName)) lead.LastName = request.LastName;
+        if (!string.IsNullOrWhiteSpace(request.Email)) lead.Email = request.Email;
+        lead.Phone = request.Phone;
+        lead.LinkedInUrl = request.LinkedInUrl;
+        lead.Company = request.Company;
+        lead.JobTitle = request.JobTitle;
+        lead.Location = request.Location;
+        lead.Country = request.Country;
+        lead.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new LeadDto
+        {
+            Id = lead.Id,
+            FirstName = lead.FirstName,
+            LastName = lead.LastName,
+            Email = lead.Email,
+            Phone = lead.Phone,
+            Company = lead.Company,
+            JobTitle = lead.JobTitle,
+            Location = lead.Location,
+            LinkedInUrl = lead.LinkedInUrl,
+            Country = lead.Country,
+            Source = lead.Source,
+            ExternalId = lead.ExternalId,
+            Status = lead.Status,
+            PreferredChannel = lead.PreferredChannel,
+            CreatedAt = lead.CreatedAt,
+            UpdatedAt = lead.UpdatedAt
+        });
+    }
+
+    private static string? TruncateNullable(string? value, int maxLength)
+    {
+        return value is null ? null : value.Length <= maxLength ? value : value[..maxLength];
+    }
+
+    private static string? BuildLocation(RhetorikAddress? address)
+    {
+        if (address is null) return null;
+        var parts = new[] { address.City, address.State, address.Country }
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .Select(part => part!.Trim())
+            .ToList();
+        return parts.Count == 0 ? null : string.Join(", ", parts);
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        return value.Length <= maxLength ? value : value[..maxLength];
     }
 
     private static IQueryable<Lead> ApplySort(IQueryable<Lead> query, string? sortBy, string? sortOrder)

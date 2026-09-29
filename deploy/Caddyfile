@@ -1,0 +1,11 @@
+# Reverse proxy for the AITS API.
+# Caddy automatically provisions and renews HTTPS certificates.
+#
+# Only the API is exposed publicly. It serves:
+#   - the MCP tools endpoint for Scotty (/api/mcp)
+#   - the public candidate pages (consent, unsubscribe, tracking, agent chat)
+#   - the authenticated admin API (requires the X-API-Key header)
+
+api.qjrecruitmentpartners.com {
+    reverse_proxy api:8080
+}

@@ -11,6 +11,10 @@ public class Campaign
     public string? BodyTemplate { get; set; }
     public OutreachChannel Channel { get; set; } = OutreachChannel.Email;
     public CampaignStatus Status { get; set; } = CampaignStatus.Draft;
+    public int? SequenceId { get; set; }
+    public Sequence? Sequence { get; set; }
+    public bool IsRunning { get; set; }
+    public DateTime? LastRunAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }

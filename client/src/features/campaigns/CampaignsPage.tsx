@@ -1,8 +1,12 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Loader2, Plus } from 'lucide-react'
-import { useCreateCampaignMutation, useGetCampaignsQuery } from '@/services/apiSlice'
-import { campaignStatusLabels, outreachChannelLabels } from '@/types/models'
+import {
+  useCreateCampaignMutation,
+  useGetCampaignsQuery,
+  useGetSequencesQuery,
+} from '@/services/apiSlice'
+import { campaignStatusLabels } from '@/types/models'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,15 +16,14 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
 interface CampaignFormValues {
-  subjectTemplate?: string
-  bodyTemplate?: string
-  channel?: string
   name: string
   description?: string
+  sequenceId?: string
 }
 
 export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number) => void }) {
   const { data: campaigns = [], isLoading } = useGetCampaignsQuery()
+  const { data: sequences = [] } = useGetSequencesQuery()
   const [createCampaign, { isLoading: creating }] = useCreateCampaignMutation()
   const {
     register,
@@ -30,18 +33,19 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
   } = useForm<CampaignFormValues>()
   const [error, setError] = useState<string | null>(null)
 
+  const sequenceNameById = new Map(sequences.map((sequence) => [sequence.id, sequence.name]))
+
   const onSubmit = handleSubmit(async (values) => {
     setError(null)
     try {
       await createCampaign({
         name: values.name,
         description: values.description || undefined,
-        subjectTemplate: values.subjectTemplate || undefined,
-        bodyTemplate: values.bodyTemplate || undefined,
-        channel: Number(values.channel ?? 0),
+        sequenceId: values.sequenceId ? Number(values.sequenceId) : null,
+        channel: 0,
       }).unwrap()
       reset()
-    } catch (e) {
+    } catch {
       setError('Could not create the campaign. Please try again.')
     }
   })
@@ -51,7 +55,7 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
       <Card className="lg:col-span-1">
         <CardHeader>
           <CardTitle>New campaign</CardTitle>
-          <CardDescription>Group leads into an outreach campaign.</CardDescription>
+          <CardDescription>Group leads and pick the sequence they will receive.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
@@ -62,9 +66,7 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
                 placeholder="NZ recruiters - August"
                 {...register('name', { required: 'Name is required' })}
               />
-              {errors.name && (
-                <p className="text-xs text-destructive">{errors.name.message}</p>
-              )}
+              {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="description">Description</Label>
@@ -76,26 +78,18 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="channel">Channel</Label>
-              <Select id="channel" defaultValue="0" {...register('channel')}>
-                <option value="0">{outreachChannelLabels[0]}</option>
-                <option value="3">{outreachChannelLabels[3]}</option>
+              <Label htmlFor="sequenceId">Sequence</Label>
+              <Select id="sequenceId" defaultValue="" {...register('sequenceId')}>
+                <option value="">No sequence yet</option>
+                {sequences.map((sequence) => (
+                  <option key={sequence.id} value={sequence.id}>
+                    {sequence.name} ({sequence.steps.length} step
+                    {sequence.steps.length === 1 ? '' : 's'})
+                  </option>
+                ))}
               </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="subjectTemplate">Subject template</Label>
-              <Input
-                id="subjectTemplate"
-                placeholder="Quick question, {'{{FirstName}}'}"
-                {...register('subjectTemplate')}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="bodyTemplate">Body template</Label>
-              <Textarea id="bodyTemplate" rows={5} {...register('bodyTemplate')} />
               <p className="text-xs text-muted-foreground">
-                Used to auto-draft messages when you add leads to this campaign. Supports
-                {'{{FirstName}}'}, {'{{Company}}'}, {'{{JobTitle}}'}.
+                Emails and InMails are written in the Sequences area. You can also change this later.
               </p>
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
@@ -110,11 +104,11 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle>Campaigns</CardTitle>
-          <CardDescription>Click a campaign to manage its outreach messages.</CardDescription>
+          <CardDescription>Click a campaign to choose its sequence and run it.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">LoadingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</p>
+            <p className="text-sm text-muted-foreground">Loading...</p>
           ) : campaigns.length === 0 ? (
             <p className="text-sm text-muted-foreground">No campaigns yet.</p>
           ) : (
@@ -128,9 +122,12 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
                   >
                     <div>
                       <p className="font-medium">{campaign.name}</p>
-                      {campaign.description && (
-                        <p className="text-sm text-muted-foreground">{campaign.description}</p>
-                      )}
+                      <p className="text-sm text-muted-foreground">
+                        {campaign.sequenceId
+                          ? `Sequence: ${sequenceNameById.get(campaign.sequenceId) ?? `#${campaign.sequenceId}`}`
+                          : 'No sequence selected'}
+                        {campaign.description ? ` · ${campaign.description}` : ''}
+                      </p>
                     </div>
                     <Badge variant="secondary">
                       {campaignStatusLabels[campaign.status] ?? 'Unknown'}

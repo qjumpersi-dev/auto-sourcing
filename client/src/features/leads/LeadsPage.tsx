@@ -1,12 +1,15 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Loader2, MailPlus } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Loader2, MailPlus, Pencil } from 'lucide-react'
 import {
   useAddLeadsToCampaignMutation,
   useGetCampaignsQuery,
   useGetLeadsQuery,
   useUpdateLeadStatusMutation,
 } from '@/services/apiSlice'
-import { leadStatusLabels } from '@/types/models'
+import { leadStatusLabels, type Lead } from '@/types/models'
+import { ConsentModal } from './ConsentModal'
+import { LeadEditModal } from './LeadEditModal'
+import { LeadProfileModal } from './LeadProfileModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -51,6 +54,9 @@ export function LeadsPage() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<number>>(new Set())
   const [targetCampaign, setTargetCampaign] = useState('')
   const [addFeedback, setAddFeedback] = useState<string | null>(null)
+  const [consentLeadId, setConsentLeadId] = useState<number | null>(null)
+  const [editLead, setEditLead] = useState<Lead | null>(null)
+  const [profileLead, setProfileLead] = useState<Lead | null>(null)
 
   const onFilterChange = (value: string) => {
     setFilterCampaignId(value)
@@ -99,7 +105,7 @@ export function LeadsPage() {
       )
       setSelectedLeadIds(new Set())
     } catch {
-      setAddFeedback('Could not add leads. Does the campaign have templates set?')
+      setAddFeedback('Could not add leads. Does the campaign have a sequence set?')
     }
   }
 
@@ -195,6 +201,7 @@ export function LeadsPage() {
                   <SortableHeader label="Company" sortKey="company" sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />
                   <SortableHeader label="Job title" sortKey="jobtitle" sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />
                   <SortableHeader label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />
+                  <TableHead>Consent</TableHead>
                   <SortableHeader label="Campaigns" sortKey="campaigns" sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />
                   <SortableHeader label="Date added" sortKey="dateadded" sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />
                 </TableRow>
@@ -211,7 +218,13 @@ export function LeadsPage() {
                       />
                     </TableCell>
                     <TableCell className="font-medium">
-                      {lead.firstName} {lead.lastName}
+                      <button
+                        type="button"
+                        className="text-blue-600 hover:underline"
+                        onClick={() => setProfileLead(lead)}
+                      >
+                        {lead.firstName} {lead.lastName}
+                      </button>
                     </TableCell>
                     <TableCell>{lead.email || '-'}</TableCell>
                     <TableCell>{lead.company ?? '-'}</TableCell>
@@ -230,6 +243,25 @@ export function LeadsPage() {
                           </option>
                         ))}
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditLead(lead)}
+                        >
+                          <Pencil />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConsentLeadId(lead.id)}
+                        >
+                          Manage
+                        </Button>
+                      </div>
                     </TableCell>
                     <TableCell>
                       {lead.campaigns && lead.campaigns.length > 0
@@ -271,6 +303,15 @@ export function LeadsPage() {
           </>
         )}
       </CardContent>
+      {consentLeadId !== null && (
+        <ConsentModal leadId={consentLeadId} onClose={() => setConsentLeadId(null)} />
+      )}
+      {editLead !== null && (
+        <LeadEditModal lead={editLead} onClose={() => setEditLead(null)} />
+      )}
+      {profileLead !== null && (
+        <LeadProfileModal lead={profileLead} onClose={() => setProfileLead(null)} />
+      )}
     </Card>
   )
 }

@@ -1,15 +1,28 @@
+using AutoSourcing.API.BackgroundServices;
+using AutoSourcing.API.Middleware;
+using AutoSourcing.API.Serialization;
 using AutoSourcing.Data;
+using AutoSourcing.Services.Agent;
+using AutoSourcing.Services.ContentGeneration;
 using AutoSourcing.Services.Email;
+using AutoSourcing.Services.Jobs;
 using AutoSourcing.Services.LinkedIn;
 using AutoSourcing.Services.NLSearch;
 using AutoSourcing.Services.Outreach;
 using AutoSourcing.Services.Rhetorik;
 using AutoSourcing.Services.Scotty;
+using AutoSourcing.Services.Sms;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new TimeOnlyJsonConverter());
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddMemoryCache();
@@ -28,11 +41,24 @@ builder.Services.AddHttpClient<INLSearchService, NLSearchService>();
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 builder.Services.AddSingleton<IEmailService, SmtpEmailService>();
+builder.Services.AddSingleton<IUnsubscribeService, UnsubscribeService>();
+builder.Services.AddSingleton<IEmailTrackingService, EmailTrackingService>();
 builder.Services.AddSingleton<IPersonalizationService, PersonalizationService>();
 builder.Services.AddScoped<IOutreachService, OutreachService>();
+builder.Services.AddScoped<ISequenceService, SequenceService>();
 
 builder.Services.Configure<LinkedInOptions>(builder.Configuration.GetSection(LinkedInOptions.SectionName));
 builder.Services.AddSingleton<ILinkedInService, PlaywrightLinkedInService>();
+
+builder.Services.Configure<SmsOptions>(builder.Configuration.GetSection(SmsOptions.SectionName));
+builder.Services.AddHttpClient<ISmsService, TwilioSmsService>();
+
+builder.Services.AddSingleton<IJobService, JobService>();
+builder.Services.AddHttpClient<IContentGenerationService, ContentGenerationService>();
+builder.Services.AddScoped<ICandidateAgentService, CandidateAgentService>();
+
+builder.Services.AddSingleton<ICampaignRunQueue, CampaignRunQueue>();
+builder.Services.AddHostedService<CampaignRunBackgroundService>();
 
 var app = builder.Build();
 
@@ -47,6 +73,8 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AutoSourcingDbContext>();
     db.Database.Migrate();
 }
+
+app.UseMiddleware<ApiKeyMiddleware>();
 
 app.UseAuthorization();
 app.MapControllers();

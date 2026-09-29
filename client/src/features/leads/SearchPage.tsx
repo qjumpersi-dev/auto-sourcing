@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { AlertCircle, Download, Loader2, MailPlus, Search, Sparkles } from 'lucide-react'
 import {
@@ -8,7 +8,7 @@ import {
   useImportToCampaignMutation,
   useSearchRhetorikMutation,
 } from '@/services/apiSlice'
-import type { ProfileSearchRequest, EnrichedProfileSearchResponse, Scope, ExpertiseMode } from '@/types/models'
+import type { ProfileSearchRequest, EnrichedProfileSearchResponse, Scope, ExpertiseMode, Lead } from '@/types/models'
 import { SuggestionInput } from '@/components/Combobox'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { LeadProfileModal } from './LeadProfileModal'
 
 interface SearchFormValues {
   freeText: string
@@ -58,7 +59,7 @@ function jobTitle(r: EnrichedProfileSearchResponse['results'][number]): string |
   return exp?.job_title ?? r.profile_data?.profile_headline ?? null
 }
 
-export function SearchPage() {
+export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearchRequest }) {
   const [searchRhetorik, { isLoading: searching }] = useSearchRhetorikMutation()
   const [generateSpec] = useGenerateSearchSpecMutation()
   const [importFromRhetorik, { isLoading: importing }] = useImportFromRhetorikMutation()
@@ -72,6 +73,8 @@ export function SearchPage() {
   const [targetCampaign, setTargetCampaign] = useState('')
   const [addFeedback, setAddFeedback] = useState<string | null>(null)
   const [jobTitleSuggestions, setJobTitleSuggestions] = useState<string[]>([])
+  const [profileLead, setProfileLead] = useState<Lead | null>(null)
+  const [rhetorikFallback, setRhetorikFallback] = useState<any>(null)
 
   const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<SearchFormValues>({
     defaultValues: {
@@ -88,6 +91,32 @@ export function SearchPage() {
       cities: '',
     },
   })
+
+  useEffect(() => {
+    if (initialCriteria) {
+      if (initialCriteria.jobTitles?.length) {
+        setValue('jobTitles', initialCriteria.jobTitles.join(', '))
+      }
+      if (initialCriteria.keywords?.length) {
+        setValue('keywords', initialCriteria.keywords.join(', '))
+      }
+      if (initialCriteria.expertises?.length) {
+        setValue('expertises', initialCriteria.expertises.join(', '))
+      }
+      if (initialCriteria.expertiseMode) {
+        setValue('expertiseMode', initialCriteria.expertiseMode)
+      }
+      if (initialCriteria.countries?.length) {
+        setValue('country', initialCriteria.countries.join(', '))
+      }
+      if (initialCriteria.states?.length) {
+        setValue('states', initialCriteria.states.join(', '))
+      }
+      if (initialCriteria.cities?.length) {
+        setValue('cities', initialCriteria.cities.join(', '))
+      }
+    }
+  }, [initialCriteria, setValue])
 
   const buildRequest = (): ProfileSearchRequest => {
     const v = getValues()
@@ -220,7 +249,7 @@ export function SearchPage() {
       setSelectedResultIds(new Set())
       await refreshResults()
     } catch {
-      setAddFeedback('Could not add candidates to the campaign. Does the campaign have templates set?')
+      setAddFeedback('Could not add candidates to the campaign. Does the campaign have a sequence set?')
     }
   }
 
@@ -459,7 +488,66 @@ export function SearchPage() {
                         />
                       </TableCell>
                       <TableCell className="font-medium">
-                        {r.profile_data ? `${r.profile_data.profile_first_name} ${r.profile_data.profile_last_name}` : '-'}
+                        {r.profile_data ? (
+                          <button
+                            type="button"
+                            className="text-blue-600 hover:underline"
+                            onClick={() => {
+                              const pd = r.profile_data!
+                              const rd = r.resume_data
+                              const exp = rd?.experiences ?? []
+                              setProfileLead({
+                                id: r.lead_id ?? 0,
+                                firstName: pd.profile_first_name,
+                                lastName: pd.profile_last_name,
+                                email: '',
+                                phone: null,
+                                company: companyName(r),
+                                jobTitle: jobTitle(r),
+                                location: [pd.profile_address?.city, pd.profile_address?.country].filter(Boolean).join(', ') || null,
+                                linkedInUrl: null,
+                                source: '',
+                                externalId: null,
+                                status: 0,
+                                preferredChannel: null,
+                                country: pd.profile_address?.country ?? null,
+                                createdAt: '',
+                                updatedAt: null,
+                                campaigns: r.campaigns ?? null,
+                              })
+                              setRhetorikFallback({
+                                headline: pd.profile_headline,
+                                summary: pd.profile_summary,
+                                selfReportedSkills: pd.profile_expertises,
+                                workExperience: exp.map((e: any) => ({
+                                  company: e.raw_company_name ?? e.company_name,
+                                  title: e.job_title,
+                                  current: e.current,
+                                  startDate: e.start_date,
+                                  endDate: e.end_date,
+                                })),
+                                education: (rd?.educations ?? []).map((e: any) => ({
+                                  school: e.educational_establishment,
+                                  degree: e.diploma,
+                                  specialization: e.specialization,
+                                  startDate: e.start_date,
+                                  endDate: e.end_date,
+                                })),
+                                certifications: (rd?.certifications ?? []).map((c: any) => c.name).filter(Boolean),
+                                industries: pd.profile_tags?.filter((t: string) => t.toLowerCase().includes('industry')) ?? [],
+                                languages: pd.profile_languages ?? [],
+                                memberships: (rd?.memberships ?? []).map((m: any) => m.name ?? m.title).filter(Boolean),
+                                publications: (rd?.publications ?? []).map((p: any) => p.name).filter(Boolean),
+                                awards: (rd?.awards ?? []).map((a: any) => a.name).filter(Boolean),
+                                patents: (rd?.patents ?? []).map((p: any) => p.name).filter(Boolean),
+                              })
+                            }}
+                          >
+                            {r.profile_data.profile_first_name} {r.profile_data.profile_last_name}
+                          </button>
+                        ) : (
+                          '-'
+                        )}
                       </TableCell>
                       <TableCell>{c ?? '-'}</TableCell>
                       <TableCell>{jobTitle(r) ?? '-'}</TableCell>
@@ -488,6 +576,9 @@ export function SearchPage() {
           </div>
         )}
       </CardContent>
+      {profileLead && (
+        <LeadProfileModal lead={profileLead} rhetorikData={rhetorikFallback} onClose={() => { setProfileLead(null); setRhetorikFallback(null) }} />
+      )}
     </Card>
   )
 }

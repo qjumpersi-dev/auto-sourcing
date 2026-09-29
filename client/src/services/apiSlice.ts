@@ -3,19 +3,40 @@ import type {
   AutocompleteSuggestion,
   Campaign,
   EnrichedProfileSearchResponse,
+  GeneratedContent,
+  GenerateContentRequest,
+  Job,
+  JobInput,
   Lead,
+  LeadConsentResponse,
+  LeadProfile,
   LinkedInStatus,
+  OrganizationProfile,
   OutreachMessage,
   PaginatedLeads,
+  PersonalisationOption,
+  PolicyGuardrails,
   ProfileSearchRequest,
   ScottyCallResponse,
   ScottyChatResponse,
+  Sequence,
+  SequenceInput,
+  SequencePreview,
 } from '@/types/models'
 
 export const apiSlice = createApi({
   reducerPath: 'api',
-  baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
-  tagTypes: ['Lead', 'Campaign', 'OutreachMessage'],
+  baseQuery: fetchBaseQuery({
+    baseUrl: '/api',
+    prepareHeaders: (headers) => {
+      const apiKey = import.meta.env.VITE_API_KEY as string | undefined
+      if (apiKey) {
+        headers.set('X-API-Key', apiKey)
+      }
+      return headers
+    },
+  }),
+  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Organization', 'Policy'],
   endpoints: (builder) => ({
     getLeads: builder.query<
       PaginatedLeads,
@@ -73,6 +94,17 @@ export const apiSlice = createApi({
       query: ({ id, status }) => ({ url: `/leads/${id}/status`, method: 'PATCH', body: { status } }),
       invalidatesTags: ['Lead'],
     }),
+    updateLead: builder.mutation<
+      Lead,
+      { id: number; firstName?: string; lastName?: string; email?: string; phone?: string | null; linkedInUrl?: string | null; company?: string | null; jobTitle?: string | null; location?: string | null; country?: string | null }
+    >({
+      query: ({ id, ...body }) => ({ url: `/leads/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['Lead'],
+    }),
+    refreshLeads: builder.mutation<{ updated: number }, { leadIds: number[] }>({
+      query: (body) => ({ url: '/leads/refresh', method: 'POST', body }),
+      invalidatesTags: ['Lead', 'OutreachMessage'],
+    }),
     getCampaigns: builder.query<Campaign[], void>({
       query: () => '/campaigns',
       providesTags: ['Campaign'],
@@ -81,16 +113,24 @@ export const apiSlice = createApi({
       query: (id) => `/campaigns/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Campaign', id }],
     }),
-    createCampaign: builder.mutation<Campaign, { name: string; description?: string; subjectTemplate?: string; bodyTemplate?: string; channel?: number }>({
+    createCampaign: builder.mutation<Campaign, { name: string; description?: string; sequenceId?: number | null; channel?: number }>({
       query: (body) => ({ url: '/campaigns', method: 'POST', body }),
       invalidatesTags: ['Campaign'],
     }),
     updateCampaign: builder.mutation<
       void,
-      { id: number; name: string; description?: string; subjectTemplate?: string; bodyTemplate?: string; status: number; channel?: number }
+      { id: number; name: string; description?: string; sequenceId?: number | null; status: number; channel?: number }
     >({
       query: ({ id, ...body }) => ({ url: `/campaigns/${id}`, method: 'PUT', body }),
-      invalidatesTags: (_result, _error, arg) => ['Campaign', { type: 'Campaign', id: arg.id }],
+      invalidatesTags: (_result, _error, arg) => ['Campaign', 'OutreachMessage', { type: 'Campaign', id: arg.id }],
+    }),
+    runCampaign: builder.mutation<{ queued: boolean; alreadyRunning?: boolean }, number>({
+      query: (id) => ({ url: `/campaigns/${id}/run`, method: 'POST' }),
+      invalidatesTags: ['Campaign', 'OutreachMessage', 'Lead'],
+    }),
+    restartCampaign: builder.mutation<{ restarted: boolean; candidates: number }, number>({
+      query: (id) => ({ url: `/campaigns/${id}/restart`, method: 'POST' }),
+      invalidatesTags: ['Campaign', 'OutreachMessage', 'Lead'],
     }),
     addLeadsToCampaign: builder.mutation<
       { added: number; skipped: number },
@@ -128,6 +168,107 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['OutreachMessage', 'Lead'],
     }),
+    markMessageReplied: builder.mutation<void, { campaignId: number; messageId: number }>({
+      query: ({ campaignId, messageId }) => ({
+        url: `/campaigns/${campaignId}/messages/${messageId}/mark-replied`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['OutreachMessage'],
+    }),
+    getSequences: builder.query<Sequence[], void>({
+      query: () => '/sequences',
+      providesTags: ['Sequence'],
+    }),
+    getSequence: builder.query<Sequence, number>({
+      query: (id) => `/sequences/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'Sequence', id }],
+    }),
+    createSequence: builder.mutation<Sequence, SequenceInput>({
+      query: (body) => ({ url: '/sequences', method: 'POST', body }),
+      invalidatesTags: ['Sequence'],
+    }),
+    updateSequence: builder.mutation<Sequence, { id: number } & SequenceInput>({
+      query: ({ id, ...body }) => ({ url: `/sequences/${id}`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, arg) => ['Sequence', { type: 'Sequence', id: arg.id }],
+    }),
+    deleteSequence: builder.mutation<void, number>({
+      query: (id) => ({ url: `/sequences/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Sequence'],
+    }),
+    getPersonalisationOptions: builder.query<PersonalisationOption[], void>({
+      query: () => '/sequences/personalisation-options',
+    }),
+    previewSequence: builder.mutation<
+      SequencePreview,
+      { leadId: number; subjectTemplate: string; bodyTemplate: string; channel: number; includeUnsubscribe: boolean; jobId?: number }
+    >({
+      query: (body) => ({ url: '/sequences/preview', method: 'POST', body }),
+    }),
+    getJobs: builder.query<Job[], void>({
+      query: () => '/jobs',
+      providesTags: ['Job'],
+    }),
+    getJob: builder.query<Job, number>({
+      query: (id) => `/jobs/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'Job', id }],
+    }),
+    createJob: builder.mutation<Job, JobInput>({
+      query: (body) => ({ url: '/jobs', method: 'POST', body }),
+      invalidatesTags: ['Job'],
+    }),
+    updateJob: builder.mutation<void, { id: number } & JobInput>({
+      query: ({ id, ...body }) => ({ url: `/jobs/${id}`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, arg) => ['Job', { type: 'Job', id: arg.id }],
+    }),
+    deleteJob: builder.mutation<void, number>({
+      query: (id) => ({ url: `/jobs/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Job'],
+    }),
+    generateJobSearch: builder.mutation<ProfileSearchRequest, number>({
+      query: (id) => ({ url: `/jobs/${id}/generate-search`, method: 'POST' }),
+    }),
+    getOrganization: builder.query<OrganizationProfile, void>({
+      query: () => '/organization',
+      providesTags: ['Organization'],
+    }),
+    updateOrganization: builder.mutation<OrganizationProfile, Partial<OrganizationProfile>>({
+      query: (body) => ({ url: '/organization', method: 'PUT', body }),
+      invalidatesTags: ['Organization'],
+    }),
+    getPolicy: builder.query<PolicyGuardrails, void>({
+      query: () => '/policy',
+      providesTags: ['Policy'],
+    }),
+    updatePolicy: builder.mutation<PolicyGuardrails, Partial<PolicyGuardrails>>({
+      query: (body) => ({ url: '/policy', method: 'PUT', body }),
+      invalidatesTags: ['Policy'],
+    }),
+    generateContent: builder.mutation<GeneratedContent, GenerateContentRequest>({
+      query: (body) => ({ url: '/sequences/generate-content', method: 'POST', body }),
+    }),
+    getLeadConsent: builder.query<LeadConsentResponse, number>({
+      query: (leadId) => `/leads/${leadId}/consent`,
+      providesTags: (_result, _error, leadId) => [{ type: 'Lead', id: leadId }],
+    }),
+    updateLeadConsent: builder.mutation<
+      LeadConsentResponse,
+      { leadId: number; channel: number; status: number; optInSource?: string; notes?: string }
+    >({
+      query: ({ leadId, ...body }) => ({ url: `/leads/${leadId}/consent`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: 'Lead', id: arg.leadId }],
+    }),
+    setPreferredChannel: builder.mutation<void, { leadId: number; channel: number | null }>({
+      query: ({ leadId, channel }) => ({
+        url: `/leads/${leadId}/consent/preferred-channel`,
+        method: 'PUT',
+        body: channel,
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: 'Lead', id: arg.leadId }],
+    }),
+    getLeadProfile: builder.query<LeadProfile, number>({
+      query: (leadId) => `/leads/${leadId}/profile`,
+      providesTags: (_result, _error, leadId) => [{ type: 'Lead', id: leadId }],
+    }),
     getLinkedInStatus: builder.query<LinkedInStatus, void>({
       query: () => '/linkedin/status',
     }),
@@ -151,6 +292,8 @@ export const {
   useImportFromRhetorikMutation,
   useImportToCampaignMutation,
   useUpdateLeadStatusMutation,
+  useUpdateLeadMutation,
+  useRefreshLeadsMutation,
   useGetCampaignsQuery,
   useGetCampaignQuery,
   useCreateCampaignMutation,
@@ -159,6 +302,31 @@ export const {
   useSendMessageMutation,
   useUpdateCampaignMutation,
   useAddLeadsToCampaignMutation,
+  useRunCampaignMutation,
+  useRestartCampaignMutation,
+  useMarkMessageRepliedMutation,
+  useGetSequencesQuery,
+  useGetSequenceQuery,
+  useCreateSequenceMutation,
+  useUpdateSequenceMutation,
+  useDeleteSequenceMutation,
+  useGetPersonalisationOptionsQuery,
+  usePreviewSequenceMutation,
+  useGetJobsQuery,
+  useGetJobQuery,
+  useCreateJobMutation,
+  useUpdateJobMutation,
+  useDeleteJobMutation,
+  useGenerateJobSearchMutation,
+  useGetOrganizationQuery,
+  useUpdateOrganizationMutation,
+  useGetPolicyQuery,
+  useUpdatePolicyMutation,
+  useGenerateContentMutation,
+  useGetLeadConsentQuery,
+  useUpdateLeadConsentMutation,
+  useSetPreferredChannelMutation,
+  useGetLeadProfileQuery,
   useScottyChatMutation,
   useScottyCallMutation,
   useGetLinkedInStatusQuery,

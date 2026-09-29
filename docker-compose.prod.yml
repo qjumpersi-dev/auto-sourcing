@@ -1,0 +1,57 @@
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: src/AutoSourcing.API/Dockerfile
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=AutoSourcing;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True
+      - ApiKey=${API_KEY}
+      - Email__PublicBaseUrl=https://api.qjrecruitmentpartners.com
+      - Email__SmtpHost=${SMTP_HOST}
+      - Email__SmtpPort=${SMTP_PORT}
+      - Email__Username=${SMTP_USERNAME}
+      - Email__Password=${SMTP_PASSWORD}
+      - Email__FromAddress=${SMTP_FROM_ADDRESS}
+      - Email__FromName=${SMTP_FROM_NAME}
+      - Email__EnableSsl=${SMTP_ENABLE_SSL}
+      - Sms__TwilioAccountSid=${TWILIO_ACCOUNT_SID}
+      - Sms__TwilioAuthToken=${TWILIO_AUTH_TOKEN}
+      - Sms__FromNumber=${TWILIO_FROM_NUMBER}
+      - Rhetorik__ApiKey=${RHETORIK_API_KEY}
+      - Scotty__ApiKey=${SCOTTY_API_KEY}
+      - Scotty__RestChannelId=${SCOTTY_REST_CHANNEL_ID}
+      - Scotty__WebRtcChannelId=${SCOTTY_WEBRTC_CHANNEL_ID}
+      - NLSearch__OpenAIApiKey=${OPENAI_API_KEY}
+    depends_on:
+      - sqlserver
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${SA_PASSWORD}
+      - MSSQL_PID=Express
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+
+volumes:
+  sqlserver-data:
+  caddy-data:
+  caddy-config:

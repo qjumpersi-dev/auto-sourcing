@@ -46,10 +46,19 @@ namespace AutoSourcing.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<bool>("IsRunning")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastRunAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("SequenceId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");
@@ -62,7 +71,176 @@ namespace AutoSourcing.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SequenceId");
+
                     b.ToTable("Campaigns");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.ChannelConsent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("OptInDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OptInSource")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("OptOutDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeadId", "Channel")
+                        .IsUnique();
+
+                    b.ToTable("ChannelConsents");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.ConversationMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsEscalation")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeadId");
+
+                    b.ToTable("ConversationMessages");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.Job", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdvertCopy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AdvertUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("AttractiveReasons")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Education")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Flexibility")
+                        .HasColumnType("int");
+
+                    b.Property<string>("HiringManager")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Industry")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("MustHaves")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NiceToHaves")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("SalaryFrom")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("SalaryNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal?>("SalaryTo")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("SalaryType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ScreeningDetails")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Skills")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Jobs");
                 });
 
             modelBuilder.Entity("AutoSourcing.Core.Entities.Lead", b =>
@@ -76,6 +254,13 @@ namespace AutoSourcing.Data.Migrations
                     b.Property<string>("Company")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ConversationKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -106,9 +291,16 @@ namespace AutoSourcing.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("Location")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("PreferredChannel")
+                        .HasColumnType("int");
 
                     b.Property<string>("Source")
                         .IsRequired()
@@ -123,6 +315,8 @@ namespace AutoSourcing.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ConversationKey");
+
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasFilter("[Email] <> ''");
@@ -130,6 +324,154 @@ namespace AutoSourcing.Data.Migrations
                     b.HasIndex("ExternalId");
 
                     b.ToTable("Leads");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.LeadEmail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeadId", "Email")
+                        .IsUnique();
+
+                    b.ToTable("LeadEmails");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.LeadProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AIInferredSkills")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Awards")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Certifications")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Education")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Headline")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Industries")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Languages")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("LastUpdatedByCandidate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Memberships")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Patents")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Publications")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SelfReportedSkills")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Summary")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("WorkExperience")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeadId")
+                        .IsUnique();
+
+                    b.ToTable("LeadProfiles");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.OrganizationProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("About")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Culture")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EEO")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EVP")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EscalationEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("GuardRails")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HiringProcess")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OrgName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("OrganizationProfiles");
                 });
 
             modelBuilder.Entity("AutoSourcing.Core.Entities.OutreachMessage", b =>
@@ -150,6 +492,9 @@ namespace AutoSourcing.Data.Migrations
                     b.Property<int>("Channel")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("ClickedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -160,10 +505,19 @@ namespace AutoSourcing.Data.Migrations
                     b.Property<int>("LeadId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("OpenedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("RepliedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime?>("SentAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StepOrder")
                         .HasColumnType("int");
 
                     b.Property<string>("Subject")
@@ -177,6 +531,190 @@ namespace AutoSourcing.Data.Migrations
                     b.HasIndex("LeadId");
 
                     b.ToTable("OutreachMessages");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.PolicyGuardrails", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("ConfidenceThreshold")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EscalationTriggers")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MarketRules")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NeedsHumanStates")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RefusalTopics")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequiredDisclaimers")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WhatAiMayAnswer")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PolicyGuardrails");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.Sequence", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IncludeUnsubscribe")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("SendDaysMask")
+                        .HasColumnType("int");
+
+                    b.Property<TimeOnly>("SendWindowEnd")
+                        .HasColumnType("time");
+
+                    b.Property<TimeOnly>("SendWindowStart")
+                        .HasColumnType("time");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Sequences");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.SequenceStep", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BodyTemplate")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Condition")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DelayDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SequenceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SubjectTemplate")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SequenceId");
+
+                    b.ToTable("SequenceSteps");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.Campaign", b =>
+                {
+                    b.HasOne("AutoSourcing.Core.Entities.Sequence", "Sequence")
+                        .WithMany("Campaigns")
+                        .HasForeignKey("SequenceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Sequence");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.ChannelConsent", b =>
+                {
+                    b.HasOne("AutoSourcing.Core.Entities.Lead", "Lead")
+                        .WithMany("ChannelConsents")
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lead");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.ConversationMessage", b =>
+                {
+                    b.HasOne("AutoSourcing.Core.Entities.Lead", "Lead")
+                        .WithMany("Conversations")
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lead");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.LeadEmail", b =>
+                {
+                    b.HasOne("AutoSourcing.Core.Entities.Lead", "Lead")
+                        .WithMany("Emails")
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lead");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.LeadProfile", b =>
+                {
+                    b.HasOne("AutoSourcing.Core.Entities.Lead", "Lead")
+                        .WithOne("Profile")
+                        .HasForeignKey("AutoSourcing.Core.Entities.LeadProfile", "LeadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lead");
                 });
 
             modelBuilder.Entity("AutoSourcing.Core.Entities.OutreachMessage", b =>
@@ -198,6 +736,17 @@ namespace AutoSourcing.Data.Migrations
                     b.Navigation("Lead");
                 });
 
+            modelBuilder.Entity("AutoSourcing.Core.Entities.SequenceStep", b =>
+                {
+                    b.HasOne("AutoSourcing.Core.Entities.Sequence", "Sequence")
+                        .WithMany("Steps")
+                        .HasForeignKey("SequenceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Sequence");
+                });
+
             modelBuilder.Entity("AutoSourcing.Core.Entities.Campaign", b =>
                 {
                     b.Navigation("OutreachMessages");
@@ -205,7 +754,22 @@ namespace AutoSourcing.Data.Migrations
 
             modelBuilder.Entity("AutoSourcing.Core.Entities.Lead", b =>
                 {
+                    b.Navigation("ChannelConsents");
+
+                    b.Navigation("Conversations");
+
+                    b.Navigation("Emails");
+
                     b.Navigation("OutreachMessages");
+
+                    b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.Sequence", b =>
+                {
+                    b.Navigation("Campaigns");
+
+                    b.Navigation("Steps");
                 });
 #pragma warning restore 612, 618
         }

@@ -57,6 +57,60 @@ public class RhetorikClientTests
     }
 
     [Fact]
+    public async Task FetchContactEmailsAsync_UsesRevealAllData_AndParsesContactAndProfileEmails()
+    {
+        const string json = """
+            {
+              "counts": { "profiles_total_results": 1, "profiles_total_returned": 1 },
+              "results": [
+                {
+                  "position": 1,
+                  "profile_data": {
+                    "profile_id": "prof-abc-123",
+                    "profile_first_name": "Jane",
+                    "profile_last_name": "Doe",
+                    "profile_emails": [
+                      { "email": "jane.doe@gmail.com", "priority": 1 },
+                      { "email": "jane@acmecorp.com", "priority": 2 }
+                    ]
+                  },
+                  "contact_data": {
+                    "contact_emails": [
+                      { "email": "jane.doe@gmail.com", "type": "Personal", "status": "Valid" },
+                      { "email": "jane@acmecorp.com", "type": "Business", "status": "Verified" },
+                      { "email": "jane@unknownmail.io", "type": "Unknown", "status": "Verified" }
+                    ]
+                  }
+                }
+              ],
+              "pagination": { "current": 1, "last_page": 1, "next_page": null }
+            }
+            """;
+
+        var (sut, handler) = CreateClient(json);
+
+        var result = await sut.FetchContactEmailsAsync(new[] { "prof-abc-123" });
+
+        var payload = handler.LastRequestBody;
+        Assert.True(payload.GetProperty("reveal_all_data").GetBoolean());
+        var profileIds = payload.GetProperty("parameters").GetProperty("profile_id");
+        Assert.Equal("is one of", profileIds[0].GetProperty("operator").GetString());
+        Assert.Equal(
+            new List<string> { "prof-abc-123" },
+            ValueList(profileIds[0]));
+
+        var data = Assert.Single(result);
+        Assert.Equal("prof-abc-123", data.Key);
+        Assert.Equal(3, data.Value.ContactEmails.Count);
+        Assert.Equal("jane.doe@gmail.com", data.Value.ContactEmails[0].Email);
+        Assert.Equal("Personal", data.Value.ContactEmails[0].Type);
+        Assert.Equal("Verified", data.Value.ContactEmails[1].Status);
+        Assert.Equal(2, data.Value.ProfileEmails.Count);
+        Assert.Equal("jane.doe@gmail.com", data.Value.ProfileEmails[0].Email);
+        Assert.Equal(1, data.Value.ProfileEmails[0].Priority);
+    }
+
+    [Fact]
     public async Task SearchAndMapToLeadsAsync_MapsCurrentExperience()
     {
         const string json = """
