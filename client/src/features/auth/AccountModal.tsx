@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useDispatch } from 'react-redux'
-import { Loader2, Save, X } from 'lucide-react'
-import { useUpdateMeMutation } from '@/services/apiSlice'
+import { Loader2, Save, Send, X } from 'lucide-react'
+import { useSendTestEmailMutation, useUpdateMeMutation } from '@/services/apiSlice'
 import { setUser } from '@/store/authSlice'
 import type { AuthUser } from '@/types/models'
 import { Button } from '@/components/ui/button'
@@ -11,24 +11,29 @@ import { Label } from '@/components/ui/label'
 export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () => void }) {
   const dispatch = useDispatch()
   const [updateMe, { isLoading }] = useUpdateMeMutation()
+  const [sendTestEmail, { isLoading: testing }] = useSendTestEmailMutation()
 
   const [displayName, setDisplayName] = useState(user.displayName)
   const [sendFromName, setSendFromName] = useState(user.sendFromName ?? '')
   const [sendFromAddress, setSendFromAddress] = useState(user.sendFromAddress ?? '')
   const [replyToAddress, setReplyToAddress] = useState(user.replyToAddress ?? '')
+  const [testTo, setTestTo] = useState('')
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+
+  const buildPayload = () => ({
+    displayName,
+    sendFromName: sendFromName || null,
+    sendFromAddress: sendFromAddress || null,
+    replyToAddress: replyToAddress || null,
+  })
 
   const onSave = async () => {
     setError(null)
     setSaved(false)
     try {
-      const updated = await updateMe({
-        displayName,
-        sendFromName: sendFromName || null,
-        sendFromAddress: sendFromAddress || null,
-        replyToAddress: replyToAddress || null,
-      }).unwrap()
+      const updated = await updateMe(buildPayload()).unwrap()
       dispatch(setUser(updated))
       setSaved(true)
     } catch {
@@ -36,9 +41,28 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
     }
   }
 
+  const onTest = async () => {
+    setError(null)
+    setSaved(false)
+    setTestResult(null)
+    try {
+      const updated = await updateMe(buildPayload()).unwrap()
+      dispatch(setUser(updated))
+
+      const result = await sendTestEmail({ to: testTo || undefined }).unwrap()
+      setTestResult(
+        result.sent
+          ? { ok: true, message: `Test email sent to ${result.to}. Check that inbox (and spam).` }
+          : { ok: false, message: result.error ?? 'The server could not send the test email.' },
+      )
+    } catch {
+      setTestResult({ ok: false, message: 'Could not reach the API to send the test email.' })
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-lg rounded-lg border bg-white p-6 shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h3 className="text-lg font-semibold">Account &amp; sending identity</h3>
@@ -94,6 +118,39 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
             <p className="text-xs text-muted-foreground">
               Where candidate replies go. Defaults to your email.
             </p>
+          </div>
+
+          <div className="rounded-md border p-3">
+            <p className="text-sm font-medium">Test your email setup</p>
+            <p className="text-xs text-muted-foreground">
+              Saves your settings, then sends a test message so you can confirm delivery.
+            </p>
+            <div className="mt-2 flex items-end gap-2">
+              <div className="flex-1 space-y-1.5">
+                <Label>Send to</Label>
+                <Input
+                  type="email"
+                  value={testTo}
+                  onChange={(e) => setTestTo(e.target.value)}
+                  placeholder={user.email}
+                />
+              </div>
+              <Button variant="outline" onClick={onTest} disabled={testing || isLoading}>
+                {testing ? <Loader2 className="animate-spin" /> : <Send />}
+                Send test email
+              </Button>
+            </div>
+            {testResult && (
+              <p
+                className={
+                  testResult.ok
+                    ? 'mt-2 text-sm text-emerald-600'
+                    : 'mt-2 text-sm text-destructive'
+                }
+              >
+                {testResult.message}
+              </p>
+            )}
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

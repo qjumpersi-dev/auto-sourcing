@@ -84,6 +84,9 @@ export const apiSlice = createApi({
     logout: builder.mutation<{ signedOut: boolean }, void>({
       query: () => ({ url: '/auth/logout', method: 'POST' }),
     }),
+    sendTestEmail: builder.mutation<{ sent: boolean; to: string; error?: string }, { to?: string }>({
+      query: (body) => ({ url: '/email/test', method: 'POST', body }),
+    }),
     getLeads: builder.query<
       PaginatedLeads,
       {
@@ -343,6 +346,7 @@ export const {
   useGetMeQuery,
   useUpdateMeMutation,
   useLogoutMutation,
+  useSendTestEmailMutation,
   useGetLeadsQuery,
   useSearchRhetorikMutation,
   useGenerateSearchSpecMutation,
