@@ -22,7 +22,7 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=AutoSourcing;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True
       - ApiKey=${API_KEY}
-      - Email__PublicBaseUrl=https://api.qjrecruitmentpartners.com
+      - Email__PublicBaseUrl=https://www.quickmatchai.com
       - Email__SmtpHost=${SMTP_HOST}
       - Email__SmtpPort=${SMTP_PORT}
       - Email__Username=${SMTP_USERNAME}

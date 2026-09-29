@@ -6,6 +6,6 @@
 #   - the public candidate pages (consent, unsubscribe, tracking, agent chat)
 #   - the authenticated admin API (requires the X-API-Key header)
 
-api.qjrecruitmentpartners.com {
+www.quickmatchai.com {
     reverse_proxy api:8080
 }
