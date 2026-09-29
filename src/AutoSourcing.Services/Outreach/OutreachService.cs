@@ -1,6 +1,7 @@
 using AutoSourcing.Core.Entities;
 using AutoSourcing.Core.Enums;
 using AutoSourcing.Data;
+using AutoSourcing.Services.Auth;
 using AutoSourcing.Services.Email;
 using AutoSourcing.Services.LinkedIn;
 using AutoSourcing.Services.Rhetorik;
@@ -19,6 +20,7 @@ public class OutreachService : IOutreachService
     private readonly IEmailTrackingService _emailTracking;
     private readonly IRhetorikClient _rhetorikClient;
     private readonly ISmsService _smsService;
+    private readonly ISenderProvider _senderProvider;
 
     public OutreachService(
         AutoSourcingDbContext dbContext,
@@ -28,7 +30,8 @@ public class OutreachService : IOutreachService
         IUnsubscribeService unsubscribeService,
         IEmailTrackingService emailTracking,
         IRhetorikClient rhetorikClient,
-        ISmsService smsService)
+        ISmsService smsService,
+        ISenderProvider senderProvider)
     {
         _dbContext = dbContext;
         _personalization = personalization;
@@ -38,6 +41,7 @@ public class OutreachService : IOutreachService
         _emailTracking = emailTracking;
         _rhetorikClient = rhetorikClient;
         _smsService = smsService;
+        _senderProvider = senderProvider;
     }
 
     public async Task<OutreachMessage> CreateDraftAsync(int leadId, int campaignId, string subjectTemplate, string bodyTemplate, OutreachChannel channel, CancellationToken cancellationToken = default)
@@ -162,7 +166,8 @@ public class OutreachService : IOutreachService
                     message.Subject ?? "(no subject)",
                     emailBody,
                     _unsubscribeService.BuildHeaders(message.Lead),
-                    cancellationToken);
+                    cancellationToken,
+                    ResolveSender(message));
                 break;
 
             case OutreachChannel.LinkedIn:
@@ -580,6 +585,7 @@ public class OutreachService : IOutreachService
     private OutreachMessage BuildDraft(Lead lead, int campaignId, string subjectTemplate, string bodyTemplate, OutreachChannel channel, int? stepOrder)
     {
         var orgName = _dbContext.OrganizationProfiles.AsNoTracking().FirstOrDefault()?.OrgName;
+        var sender = _senderProvider.Current;
 
         return new OutreachMessage
         {
@@ -589,7 +595,23 @@ public class OutreachService : IOutreachService
             Subject = _personalization.RenderTemplate(subjectTemplate, lead, orgName: orgName),
             Body = _personalization.RenderTemplate(bodyTemplate, lead, orgName: orgName),
             StepOrder = stepOrder,
-            Status = OutreachMessageStatus.Draft
+            Status = OutreachMessageStatus.Draft,
+            SentByUserId = sender.UserId,
+            FromAddress = sender.FromAddress,
+            FromName = sender.FromName,
+            ReplyTo = sender.ReplyTo
         };
+    }
+
+    private SenderIdentity ResolveSender(OutreachMessage message)
+    {
+        if (!string.IsNullOrWhiteSpace(message.FromAddress) ||
+            !string.IsNullOrWhiteSpace(message.FromName) ||
+            !string.IsNullOrWhiteSpace(message.ReplyTo))
+        {
+            return new SenderIdentity(message.SentByUserId, message.FromAddress, message.FromName, message.ReplyTo);
+        }
+
+        return _senderProvider.Current;
     }
 }

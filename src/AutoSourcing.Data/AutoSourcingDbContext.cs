@@ -21,6 +21,8 @@ public class AutoSourcingDbContext : DbContext
     public DbSet<LeadProfile> LeadProfiles => Set<LeadProfile>();
     public DbSet<PolicyGuardrails> PolicyGuardrails => Set<PolicyGuardrails>();
     public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -88,6 +90,9 @@ public class AutoSourcingDbContext : DbContext
             entity.Property(m => m.OpenedAt);
             entity.Property(m => m.ClickedAt);
             entity.Property(m => m.RepliedAt);
+            entity.Property(m => m.FromAddress).HasMaxLength(320);
+            entity.Property(m => m.FromName).HasMaxLength(200);
+            entity.Property(m => m.ReplyTo).HasMaxLength(320);
 
             entity.HasOne(m => m.Lead)
                 .WithMany(l => l.OutreachMessages)
@@ -194,6 +199,28 @@ public class AutoSourcingDbContext : DbContext
         {
             entity.Property(c => c.Role).HasMaxLength(20).IsRequired();
             entity.Property(c => c.Content).HasColumnType("nvarchar(max)");
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(u => u.Email).IsUnique();
+            entity.Property(u => u.Email).HasMaxLength(320).IsRequired();
+            entity.Property(u => u.DisplayName).HasMaxLength(200).IsRequired();
+            entity.Property(u => u.PasswordHash).HasMaxLength(500).IsRequired();
+            entity.Property(u => u.SendFromAddress).HasMaxLength(320);
+            entity.Property(u => u.SendFromName).HasMaxLength(200);
+            entity.Property(u => u.ReplyToAddress).HasMaxLength(320);
+
+            entity.HasMany(u => u.Sessions)
+                .WithOne(s => s.User)
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserSession>(entity =>
+        {
+            entity.HasIndex(s => s.TokenHash).IsUnique();
+            entity.Property(s => s.TokenHash).HasMaxLength(200).IsRequired();
         });
     }
 }

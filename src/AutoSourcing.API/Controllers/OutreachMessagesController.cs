@@ -55,6 +55,10 @@ public class OutreachMessagesController : ControllerBase
                 m.RepliedAt,
                 m.CreatedAt,
                 m.SentAt,
+                m.SentByUserId,
+                m.FromAddress,
+                m.FromName,
+                m.ReplyTo,
                 Lead = new
                 {
                     m.Lead.Id,

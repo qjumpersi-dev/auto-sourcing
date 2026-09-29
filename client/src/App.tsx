@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck, LogOut, UserCog } from 'lucide-react'
 import { SearchPage } from '@/features/leads/SearchPage'
 import { LeadsPage } from '@/features/leads/LeadsPage'
 import { CampaignsPage } from '@/features/campaigns/CampaignsPage'
@@ -11,7 +12,12 @@ import { JobEditorPage } from '@/features/jobs/JobEditorPage'
 import { OrganizationPage } from '@/features/admin/OrganizationPage'
 import { GuardrailsPage } from '@/features/admin/GuardrailsPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
+import { LoginPage } from '@/features/auth/LoginPage'
+import { AccountModal } from '@/features/auth/AccountModal'
 import ScottyAssistant from '@/components/ScottyAssistant'
+import { useGetMeQuery, useLogoutMutation } from '@/services/apiSlice'
+import { clearCredentials, setUser } from '@/store/authSlice'
+import type { RootState } from '@/store'
 import { cn } from '@/lib/utils'
 import type { ProfileSearchRequest } from '@/types/models'
 
@@ -34,7 +40,34 @@ const nav = [
 ] as const
 
 function App() {
+  const dispatch = useDispatch()
+  const token = useSelector((state: RootState) => state.auth.token)
+  const user = useSelector((state: RootState) => state.auth.user)
+  const [showAccount, setShowAccount] = useState(false)
   const [view, setView] = useState<View>({ page: 'search' })
+
+  const { data: me } = useGetMeQuery(undefined, { skip: !token })
+  const [logout] = useLogoutMutation()
+
+  useEffect(() => {
+    if (me) {
+      dispatch(setUser(me))
+    }
+  }, [me, dispatch])
+
+  if (!token) {
+    return <LoginPage />
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap()
+    } catch {
+      // Ignore network errors on sign-out; clear locally regardless.
+    }
+    dispatch(clearCredentials())
+    setView({ page: 'search' })
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -71,6 +104,29 @@ function App() {
             </button>
           ))}
         </nav>
+
+        <div className="mt-auto border-t p-3">
+          <div className="mb-2 px-1">
+            <p className="truncate text-sm font-medium">{user?.displayName ?? 'Signed in'}</p>
+            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAccount(true)}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            <UserCog />
+            Account settings
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            <LogOut />
+            Sign out
+          </button>
+        </div>
       </aside>
 
       <main className="flex-1 p-8">
@@ -124,6 +180,8 @@ function App() {
       </main>
 
       <ScottyAssistant />
+
+      {showAccount && user && <AccountModal user={user} onClose={() => setShowAccount(false)} />}
     </div>
   )
 }

@@ -1,5 +1,10 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query'
+import { AUTH_TOKEN_KEY } from '@/store/authSlice'
 import type {
+  AuthResponse,
+  AuthStatus,
+  AuthUser,
   AutocompleteSuggestion,
   Campaign,
   CampaignReportSummary,
@@ -26,20 +31,59 @@ import type {
   SequencePreview,
 } from '@/types/models'
 
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl: '/api',
+  prepareHeaders: (headers) => {
+    const token = localStorage.getItem(AUTH_TOKEN_KEY)
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+    const apiKey = import.meta.env.VITE_API_KEY as string | undefined
+    if (apiKey) {
+      headers.set('X-API-Key', apiKey)
+    }
+    return headers
+  },
+})
+
+const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
+  args,
+  api,
+  extraOptions,
+) => {
+  const result = await rawBaseQuery(args, api, extraOptions)
+  if (result.error?.status === 401) {
+    api.dispatch({ type: 'auth/clearCredentials' })
+  }
+  return result
+}
+
 export const apiSlice = createApi({
   reducerPath: 'api',
-  baseQuery: fetchBaseQuery({
-    baseUrl: '/api',
-    prepareHeaders: (headers) => {
-      const apiKey = import.meta.env.VITE_API_KEY as string | undefined
-      if (apiKey) {
-        headers.set('X-API-Key', apiKey)
-      }
-      return headers
-    },
-  }),
+  baseQuery: baseQueryWithReauth,
   tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Organization', 'Policy'],
   endpoints: (builder) => ({
+    getAuthStatus: builder.query<AuthStatus, void>({
+      query: () => '/auth/status',
+    }),
+    setupAdmin: builder.mutation<AuthResponse, { email: string; displayName: string; password: string }>({
+      query: (body) => ({ url: '/auth/setup', method: 'POST', body }),
+    }),
+    login: builder.mutation<AuthResponse, { email: string; password: string }>({
+      query: (body) => ({ url: '/auth/login', method: 'POST', body }),
+    }),
+    getMe: builder.query<AuthUser, void>({
+      query: () => '/auth/me',
+    }),
+    updateMe: builder.mutation<
+      AuthUser,
+      { displayName?: string; sendFromAddress?: string | null; sendFromName?: string | null; replyToAddress?: string | null }
+    >({
+      query: (body) => ({ url: '/auth/me', method: 'PUT', body }),
+    }),
+    logout: builder.mutation<{ signedOut: boolean }, void>({
+      query: () => ({ url: '/auth/logout', method: 'POST' }),
+    }),
     getLeads: builder.query<
       PaginatedLeads,
       {
@@ -293,6 +337,12 @@ export const apiSlice = createApi({
 })
 
 export const {
+  useGetAuthStatusQuery,
+  useSetupAdminMutation,
+  useLoginMutation,
+  useGetMeQuery,
+  useUpdateMeMutation,
+  useLogoutMutation,
   useGetLeadsQuery,
   useSearchRhetorikMutation,
   useGenerateSearchSpecMutation,

@@ -20,4 +20,10 @@ public class OutreachMessage
     public DateTime? RepliedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? SentAt { get; set; }
+
+    // Snapshot of the sending identity captured when the draft was created.
+    public int? SentByUserId { get; set; }
+    public string? FromAddress { get; set; }
+    public string? FromName { get; set; }
+    public string? ReplyTo { get; set; }
 }

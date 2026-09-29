@@ -1,8 +1,10 @@
+using AutoSourcing.API.Auth;
 using AutoSourcing.API.BackgroundServices;
 using AutoSourcing.API.Middleware;
 using AutoSourcing.API.Serialization;
 using AutoSourcing.Data;
 using AutoSourcing.Services.Agent;
+using AutoSourcing.Services.Auth;
 using AutoSourcing.Services.ContentGeneration;
 using AutoSourcing.Services.Email;
 using AutoSourcing.Services.Jobs;
@@ -29,6 +31,12 @@ builder.Services.AddMemoryCache();
 
 builder.Services.AddDbContext<AutoSourcingDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<ISenderProvider, HttpContextSenderProvider>();
 
 builder.Services.Configure<RhetorikOptions>(builder.Configuration.GetSection(RhetorikOptions.SectionName));
 builder.Services.AddHttpClient<IRhetorikClient, RhetorikClient>();

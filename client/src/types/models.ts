@@ -99,6 +99,25 @@ export interface LinkedInStatus {
   error?: string | null
 }
 
+export interface AuthUser {
+  id: number
+  email: string
+  displayName: string
+  role: string
+  sendFromAddress: string | null
+  sendFromName: string | null
+  replyToAddress: string | null
+}
+
+export interface AuthResponse {
+  token: string
+  user: AuthUser
+}
+
+export interface AuthStatus {
+  hasUsers: boolean
+}
+
 export interface OutreachMessage {
   id: number
   leadId: number
