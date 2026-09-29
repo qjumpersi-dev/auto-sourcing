@@ -61,6 +61,24 @@ export function LeadProfileModal({
     }
   }
 
+  const formatEducation = (e: { school?: string | null; degree?: string | null; specialization?: string | null; startDate?: string | null; endDate?: string | null }): string => {
+    const degree = e.degree || ''
+    const specialization = e.specialization ? ` in ${e.specialization}` : ''
+    const school = e.school ? ` at ${e.school}` : ''
+    const dates = e.startDate || e.endDate ? ` (${e.startDate || '?'} – ${e.endDate || '?'})` : ''
+    return `${degree}${specialization}${school}${dates}`.trim() || '—'
+  }
+
+  const parseEducation = (value: string | null | undefined): string[] => {
+    if (!value) return []
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed.map(formatEducation) : []
+    } catch {
+      return value.split(',').map((s) => s.trim()).filter(Boolean)
+    }
+  }
+
   // Use profile data from DB if available, otherwise fall back to Rhetorik search data
   const headline = profile?.headline ?? rhetorikData?.headline ?? lead.jobTitle
   const summary = profile?.summary ?? rhetorikData?.summary
@@ -95,8 +113,8 @@ export function LeadProfileModal({
     ? parseList(profile.patents)
     : (rhetorikData?.patents ?? [])
   const education = profile?.education
-    ? parseList(profile.education)
-    : (rhetorikData?.education?.map((e) => `${e.degree || ''}${e.specialization ? ` in ${e.specialization}` : ''}${e.school ? ` at ${e.school}` : ''}${e.startDate || e.endDate ? ` (${e.startDate || '?'} – ${e.endDate ? 'Current' : '?'})` : ''}`) ?? [])
+    ? parseEducation(profile.education)
+    : (rhetorikData?.education?.map(formatEducation) ?? [])
 
   return (
     <>
