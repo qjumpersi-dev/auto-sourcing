@@ -10,6 +10,14 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
+      - web
+
+  web:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
       - api
 
   api:

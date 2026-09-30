@@ -1,11 +1,12 @@
-# Reverse proxy for the AITS API.
+# Reverse proxy for the AITS web app and API.
 # Caddy automatically provisions and renews HTTPS certificates.
 #
-# Only the API is exposed publicly. It serves:
+# Everything is routed to the web container (nginx), which serves the React app and
+# proxies /api to the API container. The API also serves:
 #   - the MCP tools endpoint for Scotty (/api/mcp)
 #   - the public candidate pages (consent, unsubscribe, tracking, agent chat)
-#   - the authenticated admin API (requires the X-API-Key header)
+#   - the authenticated admin API (requires sign-in or the X-API-Key header)
 
 www.quickmatchai.com {
-    reverse_proxy api:8080
+    reverse_proxy web:80
 }
