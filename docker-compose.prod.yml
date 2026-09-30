@@ -38,6 +38,11 @@ services:
       - Scotty__RestChannelId=${SCOTTY_REST_CHANNEL_ID}
       - Scotty__WebRtcChannelId=${SCOTTY_WEBRTC_CHANNEL_ID}
       - NLSearch__OpenAIApiKey=${OPENAI_API_KEY}
+      - Microsoft__ClientId=${MICROSOFT_CLIENT_ID}
+      - Microsoft__TenantId=${MICROSOFT_TENANT_ID}
+      - Microsoft__ClientSecret=${MICROSOFT_CLIENT_SECRET}
+      - Microsoft__RedirectUri=${MICROSOFT_REDIRECT_URI}
+      - Microsoft__AppBaseUrl=${MICROSOFT_APP_BASE_URL}
     depends_on:
       - sqlserver
 

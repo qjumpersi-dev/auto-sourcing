@@ -18,6 +18,7 @@ import type {
   LeadConsentResponse,
   LeadProfile,
   LinkedInStatus,
+  MicrosoftStatus,
   OrganizationProfile,
   OutreachMessage,
   PaginatedLeads,
@@ -86,6 +87,15 @@ export const apiSlice = createApi({
     }),
     sendTestEmail: builder.mutation<{ sent: boolean; to: string; error?: string }, { to?: string }>({
       query: (body) => ({ url: '/email/test', method: 'POST', body }),
+    }),
+    getMicrosoftStatus: builder.query<MicrosoftStatus, void>({
+      query: () => '/auth/microsoft/status',
+    }),
+    getMicrosoftConnectUrl: builder.query<{ url: string }, void>({
+      query: () => '/auth/microsoft/connect-url',
+    }),
+    disconnectMicrosoft: builder.mutation<{ connected: boolean }, void>({
+      query: () => ({ url: '/auth/microsoft/disconnect', method: 'POST' }),
     }),
     getLeads: builder.query<
       PaginatedLeads,
@@ -347,6 +357,9 @@ export const {
   useUpdateMeMutation,
   useLogoutMutation,
   useSendTestEmailMutation,
+  useGetMicrosoftStatusQuery,
+  useLazyGetMicrosoftConnectUrlQuery,
+  useDisconnectMicrosoftMutation,
   useGetLeadsQuery,
   useSearchRhetorikMutation,
   useGenerateSearchSpecMutation,

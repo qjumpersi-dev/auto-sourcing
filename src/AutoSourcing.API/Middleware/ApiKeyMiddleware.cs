@@ -12,6 +12,7 @@ public class ApiKeyMiddleware
         "/api/auth/login",
         "/api/auth/setup",
         "/api/auth/status",
+        "/api/auth/microsoft/callback",
         "/api/consent",
         "/api/unsubscribe",
         "/api/tracking",

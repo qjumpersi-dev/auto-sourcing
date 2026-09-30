@@ -210,6 +210,9 @@ public class AutoSourcingDbContext : DbContext
             entity.Property(u => u.SendFromAddress).HasMaxLength(320);
             entity.Property(u => u.SendFromName).HasMaxLength(200);
             entity.Property(u => u.ReplyToAddress).HasMaxLength(320);
+            entity.Property(u => u.MicrosoftAccountEmail).HasMaxLength(320);
+            entity.Property(u => u.MicrosoftRefreshToken).HasColumnType("nvarchar(max)");
+            entity.Property(u => u.MicrosoftAccessToken).HasColumnType("nvarchar(max)");
 
             entity.HasMany(u => u.Sessions)
                 .WithOne(s => s.User)

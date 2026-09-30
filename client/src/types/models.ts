@@ -118,6 +118,13 @@ export interface AuthStatus {
   hasUsers: boolean
 }
 
+export interface MicrosoftStatus {
+  connected: boolean
+  accountEmail: string | null
+  connectedAt: string | null
+  configured: boolean
+}
+
 export interface OutreachMessage {
   id: number
   leadId: number

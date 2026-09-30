@@ -16,6 +16,13 @@ public class User
     public string? SendFromName { get; set; }
     public string? ReplyToAddress { get; set; }
 
+    // Microsoft 365 (Graph) connection used to send mail as this user.
+    public string? MicrosoftAccountEmail { get; set; }
+    public string? MicrosoftRefreshToken { get; set; }
+    public string? MicrosoftAccessToken { get; set; }
+    public DateTime? MicrosoftAccessTokenExpiresAt { get; set; }
+    public DateTime? MicrosoftConnectedAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }

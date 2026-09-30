@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace AutoSourcing.Services.Email;
 
-public class SmtpEmailService : IEmailService
+public class SmtpEmailService : ISmtpMailSender
 {
     private readonly EmailOptions _options;
 

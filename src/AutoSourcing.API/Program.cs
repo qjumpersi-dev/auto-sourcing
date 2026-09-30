@@ -9,6 +9,7 @@ using AutoSourcing.Services.ContentGeneration;
 using AutoSourcing.Services.Email;
 using AutoSourcing.Services.Jobs;
 using AutoSourcing.Services.LinkedIn;
+using AutoSourcing.Services.Microsoft;
 using AutoSourcing.Services.NLSearch;
 using AutoSourcing.Services.Outreach;
 using AutoSourcing.Services.Rhetorik;
@@ -48,7 +49,13 @@ builder.Services.Configure<NLSearchOptions>(builder.Configuration.GetSection(NLS
 builder.Services.AddHttpClient<INLSearchService, NLSearchService>();
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
-builder.Services.AddSingleton<IEmailService, SmtpEmailService>();
+builder.Services.AddSingleton<ISmtpMailSender, SmtpEmailService>();
+builder.Services.AddScoped<IEmailService, EmailDispatcher>();
+
+builder.Services.Configure<MicrosoftOptions>(builder.Configuration.GetSection(MicrosoftOptions.SectionName));
+builder.Services.AddSingleton<ITokenProtector, AesTokenProtector>();
+builder.Services.AddHttpClient<IMicrosoftGraphService, MicrosoftGraphService>();
+builder.Services.AddScoped<IMicrosoftTokenService, MicrosoftTokenService>();
 builder.Services.AddSingleton<IUnsubscribeService, UnsubscribeService>();
 builder.Services.AddSingleton<IEmailTrackingService, EmailTrackingService>();
 builder.Services.AddSingleton<IPersonalizationService, PersonalizationService>();

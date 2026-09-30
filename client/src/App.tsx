@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck, LogOut, UserCog } from 'lucide-react'
+import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck, LogOut, UserCog, X } from 'lucide-react'
 import { SearchPage } from '@/features/leads/SearchPage'
 import { LeadsPage } from '@/features/leads/LeadsPage'
 import { CampaignsPage } from '@/features/campaigns/CampaignsPage'
@@ -44,6 +44,7 @@ function App() {
   const token = useSelector((state: RootState) => state.auth.token)
   const user = useSelector((state: RootState) => state.auth.user)
   const [showAccount, setShowAccount] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const [view, setView] = useState<View>({ page: 'search' })
 
   const { data: me } = useGetMeQuery(undefined, { skip: !token })
@@ -54,6 +55,21 @@ function App() {
       dispatch(setUser(me))
     }
   }, [me, dispatch])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const microsoft = params.get('microsoft')
+    if (!microsoft) {
+      return
+    }
+
+    setNotice(
+      microsoft === 'connected'
+        ? 'Microsoft 365 connected — outreach will now send from your mailbox.'
+        : `Microsoft 365 connection failed: ${params.get('reason') ?? 'unknown error'}`,
+    )
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [])
 
   if (!token) {
     return <LoginPage />
@@ -131,6 +147,19 @@ function App() {
 
       <main className="flex-1 p-8">
         <div className="mx-auto max-w-6xl">
+          {notice && (
+            <div className="mb-4 flex items-start justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+              <span>{notice}</span>
+              <button
+                type="button"
+                onClick={() => setNotice(null)}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           {view.page === 'search' && <SearchPage initialCriteria={view.initialCriteria} />}
           {view.page === 'leads' && <LeadsPage />}
           {view.page === 'campaigns' && (

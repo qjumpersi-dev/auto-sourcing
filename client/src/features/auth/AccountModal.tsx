@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { Loader2, Save, Send, X } from 'lucide-react'
-import { useSendTestEmailMutation, useUpdateMeMutation } from '@/services/apiSlice'
+import {
+  useDisconnectMicrosoftMutation,
+  useGetMicrosoftStatusQuery,
+  useLazyGetMicrosoftConnectUrlQuery,
+  useSendTestEmailMutation,
+  useUpdateMeMutation,
+} from '@/services/apiSlice'
 import { setUser } from '@/store/authSlice'
 import type { AuthUser } from '@/types/models'
 import { Button } from '@/components/ui/button'
@@ -12,6 +18,9 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
   const dispatch = useDispatch()
   const [updateMe, { isLoading }] = useUpdateMeMutation()
   const [sendTestEmail, { isLoading: testing }] = useSendTestEmailMutation()
+  const { data: microsoft, refetch: refetchMicrosoft } = useGetMicrosoftStatusQuery()
+  const [fetchConnectUrl, { isLoading: connecting }] = useLazyGetMicrosoftConnectUrlQuery()
+  const [disconnectMicrosoft, { isLoading: disconnecting }] = useDisconnectMicrosoftMutation()
 
   const [displayName, setDisplayName] = useState(user.displayName)
   const [sendFromName, setSendFromName] = useState(user.sendFromName ?? '')
@@ -21,6 +30,28 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [microsoftError, setMicrosoftError] = useState<string | null>(null)
+
+  const onConnectMicrosoft = async () => {
+    setMicrosoftError(null)
+    try {
+      const { url } = await fetchConnectUrl().unwrap()
+      window.location.href = url
+    } catch (err) {
+      const data = (err as { data?: { error?: string } })?.data
+      setMicrosoftError(data?.error ?? 'Could not start the Microsoft sign-in.')
+    }
+  }
+
+  const onDisconnectMicrosoft = async () => {
+    setMicrosoftError(null)
+    try {
+      await disconnectMicrosoft().unwrap()
+      refetchMicrosoft()
+    } catch {
+      setMicrosoftError('Could not disconnect Microsoft 365.')
+    }
+  }
 
   const buildPayload = () => ({
     displayName,
@@ -55,8 +86,15 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
           ? { ok: true, message: `Test email sent to ${result.to}. Check that inbox (and spam).` }
           : { ok: false, message: result.error ?? 'The server could not send the test email.' },
       )
-    } catch {
-      setTestResult({ ok: false, message: 'Could not reach the API to send the test email.' })
+    } catch (err) {
+      const e = err as { status?: number | string; data?: { error?: string }; error?: string }
+      const detail = e?.data?.error ?? e?.error
+      setTestResult({
+        ok: false,
+        message: detail
+          ? `Could not send the test email: ${detail}`
+          : `Could not send the test email (status: ${e?.status ?? 'network error'}).`,
+      })
     }
   }
 
@@ -118,6 +156,51 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
             <p className="text-xs text-muted-foreground">
               Where candidate replies go. Defaults to your email.
             </p>
+          </div>
+
+          <div className="rounded-md border p-3">
+            <p className="text-sm font-medium">Microsoft 365 sending</p>
+            {microsoft?.connected ? (
+              <>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Connected as <span className="font-medium">{microsoft.accountEmail}</span>. Emails you send
+                  go out from this mailbox.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={onDisconnectMicrosoft}
+                  disabled={disconnecting}
+                >
+                  {disconnecting ? <Loader2 className="animate-spin" /> : null}
+                  Disconnect
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Connect your Microsoft 365 account so outreach is sent from your own mailbox (no password
+                  needed).
+                </p>
+                {microsoft && !microsoft.configured && (
+                  <p className="mt-1 text-xs text-destructive">
+                    Microsoft 365 isn't configured on the server yet.
+                  </p>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={onConnectMicrosoft}
+                  disabled={connecting || microsoft?.configured === false}
+                >
+                  {connecting ? <Loader2 className="animate-spin" /> : null}
+                  Connect Microsoft 365
+                </Button>
+              </>
+            )}
+            {microsoftError && <p className="mt-2 text-sm text-destructive">{microsoftError}</p>}
           </div>
 
           <div className="rounded-md border p-3">
