@@ -14,10 +14,32 @@ public class TrackingController : ControllerBase
         "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
 
     private readonly AutoSourcingDbContext _dbContext;
+    private readonly ILogger<TrackingController> _logger;
 
-    public TrackingController(AutoSourcingDbContext dbContext)
+    public TrackingController(AutoSourcingDbContext dbContext, ILogger<TrackingController> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
+    }
+
+    // Automated fetchers that follow links in email. Their requests must not count as clicks.
+    private static readonly string[] ScannerMarkers =
+    [
+        "bot", "crawler", "crawl", "spider", "scan", "preview", "proofpoint", "mimecast",
+        "barracuda", "symantec", "forcepoint", "safelinks", "headless", "python", "curl/",
+        "wget", "axios", "node-fetch", "go-http", "java/", "okhttp", "libwww", "httpclient"
+    ];
+
+    private bool LooksAutomated()
+    {
+        var userAgent = Request.Headers.UserAgent.ToString();
+        if (string.IsNullOrWhiteSpace(userAgent))
+        {
+            return true;
+        }
+
+        var lower = userAgent.ToLowerInvariant();
+        return ScannerMarkers.Any(marker => lower.Contains(marker));
     }
 
     [HttpGet("open/{messageId:int}.gif")]
@@ -59,11 +81,27 @@ public class TrackingController : ControllerBase
     [HttpPost("confirm/{messageId:int}")]
     public async Task<IActionResult> ConfirmClick(int messageId, CancellationToken cancellationToken)
     {
+        var userAgent = Request.Headers.UserAgent.ToString();
+
+        if (LooksAutomated())
+        {
+            _logger.LogInformation(
+                "Ignored tracking click for message {MessageId} (automated fetcher). UA: {UserAgent}",
+                messageId,
+                userAgent);
+            return NoContent();
+        }
+
         var message = await _dbContext.OutreachMessages.FindAsync([messageId], cancellationToken);
         if (message is not null && message.ClickedAt is null)
         {
             message.ClickedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Recorded tracking click for message {MessageId}. UA: {UserAgent}",
+                messageId,
+                userAgent);
         }
 
         return NoContent();
