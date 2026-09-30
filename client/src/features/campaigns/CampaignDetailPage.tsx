@@ -70,8 +70,11 @@ export function CampaignDetailPage({
     skipPollingIfUnfocused: true,
   })
   const { data: messages = [] } = useGetMessagesQuery(campaignId, {
-    pollingInterval: polling ? 3000 : 0,
+    // Poll faster while a run is in progress; otherwise poll slowly so background sends
+    // (e.g. the LinkedIn worker/extension) show up without a manual refresh.
+    pollingInterval: polling ? 3000 : 15000,
     skipPollingIfUnfocused: true,
+    refetchOnFocus: true,
   })
   const { data: sequences = [] } = useGetSequencesQuery()
   const { data: linkedInStatus, refetch: refetchLinkedInStatus } = useGetLinkedInStatusQuery()

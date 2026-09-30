@@ -29,15 +29,23 @@ export function LeadsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [addedFrom, setAddedFrom] = useState('')
   const [addedTo, setAddedTo] = useState('')
-  const { data: leadsData, isLoading: leadsLoading } = useGetLeadsQuery({
-    page: leadPage,
-    pageSize: PAGE_SIZE,
-    campaignId: filterCampaignId ? Number(filterCampaignId) : undefined,
-    sortBy,
-    sortOrder,
-    addedFrom: addedFrom || undefined,
-    addedTo: addedTo || undefined,
-  })
+  const { data: leadsData, isLoading: leadsLoading } = useGetLeadsQuery(
+    {
+      page: leadPage,
+      pageSize: PAGE_SIZE,
+      campaignId: filterCampaignId ? Number(filterCampaignId) : undefined,
+      sortBy,
+      sortOrder,
+      addedFrom: addedFrom || undefined,
+      addedTo: addedTo || undefined,
+    },
+    {
+      // Status/consent can change server-side (unsubscribes, worker updates) - keep it fresh.
+      pollingInterval: 15000,
+      skipPollingIfUnfocused: true,
+      refetchOnFocus: true,
+    },
+  )
   const leads = leadsData?.items ?? []
   const totalLeads = leadsData?.totalCount ?? 0
   const totalPages = leadsData?.totalPages ?? 0
