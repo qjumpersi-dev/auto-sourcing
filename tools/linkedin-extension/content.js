@@ -79,9 +79,9 @@ async function handleSend({ body, subject }) {
 }
 
 async function fillComposerAndSend(body, subject) {
-  const box = await waitForComposer(20000);
+  const box = await waitForComposer(30000);
   if (!box) {
-    throw new Error(`Could not open the message composer. ${describePage()} Textboxes: ${describeTextboxes()}`);
+    throw new Error(`Could not open the message composer. ${describePage()} Candidates: ${describeComposer()}`);
   }
 
   box.focus();
@@ -231,18 +231,64 @@ function describeTextboxes() {
 
 // The composer may exist before it has a laid-out size in a busy SPA, so don't require visibility.
 async function waitForComposer(timeoutMs) {
-  const selectors = ["div[role='textbox']", '.msg-form__contenteditable', "[contenteditable='true']", 'textarea'];
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    for (const selector of selectors) {
-      const el = document.querySelector(selector);
-      if (el) {
-        return el;
-      }
+    const el = findComposer();
+    if (el) {
+      return el;
     }
     await sleep(300);
   }
   return null;
+}
+
+function findComposer() {
+  const scoped = document.querySelector(
+    ".msg-form [contenteditable], .msg-form [role='textbox'], .msg-form__contenteditable, " +
+      "[role='dialog'] [contenteditable], [role='dialog'] [role='textbox'], " +
+      "[class*='compose'] [contenteditable], [class*='compose'] [role='textbox']",
+  );
+  if (scoped) {
+    return scoped;
+  }
+
+  return (
+    document.querySelector("[role='textbox']") ||
+    document.querySelector("[contenteditable='true'], [contenteditable='']") ||
+    document.querySelector('textarea') ||
+    null
+  );
+}
+
+// Detailed dump of composer candidates, for when detection fails.
+function describeComposer() {
+  const seen = [];
+
+  const add = (label, el) => {
+    const cls =
+      typeof el.className === 'string' && el.className
+        ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.')
+        : '';
+    const entry = `${label}:${el.tagName.toLowerCase()}${cls}`;
+    if (!seen.includes(entry)) {
+      seen.push(entry);
+    }
+  };
+
+  for (const el of document.querySelectorAll("[contenteditable], [role='textbox']")) {
+    add('editable', el);
+    if (seen.length >= 12) break;
+  }
+  for (const el of document.querySelectorAll('textarea, input')) {
+    add(el.tagName.toLowerCase(), el);
+    if (seen.length >= 20) break;
+  }
+  for (const el of document.querySelectorAll("[class*='msg-form'], [class*='compose'], [role='dialog']")) {
+    add('container', el);
+    if (seen.length >= 26) break;
+  }
+
+  return seen.join(' | ') || '(none)';
 }
 
 function sleep(ms) {
