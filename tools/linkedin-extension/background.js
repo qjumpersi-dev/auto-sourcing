@@ -163,7 +163,7 @@ function sendViaTab(url, payload) {
       }, 4000);
     };
 
-    chrome.tabs.create({ url, active: false }, (tab) => {
+    chrome.tabs.create({ url, active: true }, (tab) => {
       profileTabId = tab.id;
       chrome.tabs.onUpdated.addListener(onUpdated);
       chrome.tabs.onCreated.addListener(onCreated);

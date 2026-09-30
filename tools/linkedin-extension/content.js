@@ -79,7 +79,7 @@ async function handleSend({ body, subject }) {
 }
 
 async function fillComposerAndSend(body, subject) {
-  const box = await waitForSelector(["div[role='textbox']", '.msg-form__contenteditable'], 20000);
+  const box = await waitForComposer(20000);
   if (!box) {
     throw new Error(`Could not open the message composer. ${describePage()} Textboxes: ${describeTextboxes()}`);
   }
@@ -227,6 +227,22 @@ function describeTextboxes() {
   }
 
   return seen.join(' | ') || '(none)';
+}
+
+// The composer may exist before it has a laid-out size in a busy SPA, so don't require visibility.
+async function waitForComposer(timeoutMs) {
+  const selectors = ["div[role='textbox']", '.msg-form__contenteditable', "[contenteditable='true']", 'textarea'];
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const selector of selectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        return el;
+      }
+    }
+    await sleep(300);
+  }
+  return null;
 }
 
 function sleep(ms) {
