@@ -1,4 +1,12 @@
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message && message.type === 'FILL_COMPOSER') {
+    // The composer opened in its own tab; just fill and send.
+    fillComposerAndSend(message.body, message.subject)
+      .then((result) => sendResponse(result))
+      .catch((e) => sendResponse({ sent: false, error: String((e && e.message) || e) }));
+    return true;
+  }
+
   if (!message || message.type !== 'SEND_INMAIL') {
     return;
   }
@@ -20,29 +28,16 @@ async function handleSend({ body, subject }) {
     throw new Error('Not signed in to LinkedIn (a login screen was shown).');
   }
 
-  // Prefer a direct "Message"/"InMail" button on the profile.
-  const messageButton = await waitForButton(
-    [/message/i, /inmail/i],
-    [
-      "[aria-label='Message']",
-      "[aria-label*='Message']",
-      "[aria-label*='InMail']",
-      "button.artdeco-button--primary[aria-label*='essage']",
-    ],
-    20000,
-  );
-
+  // Prefer a direct "Message"/"InMail" control on the profile (not the "Messaging" nav link).
+  const messageButton = await waitForMessageButton(20000);
   if (messageButton) {
     await clickEl(messageButton);
+    await sleep(2000);
     return await fillComposerAndSend(body, subject);
   }
 
   // Otherwise try to Connect with a note.
-  const connectButton = await waitForButton([/connect/i], [
-    "button[aria-label*='Connect']",
-    "a[aria-label*='Connect']",
-  ], 8000);
-
+  const connectButton = await waitForConnectButton(8000);
   if (connectButton) {
     await clickEl(connectButton);
 
@@ -83,14 +78,10 @@ async function handleSend({ body, subject }) {
   throw new Error(`No Message or Connect button found. ${describePage()} Buttons: ${describeVisibleButtons()}`);
 }
 
-function describePage() {
-  return `url=${location.href} title="${document.title}"`;
-}
-
 async function fillComposerAndSend(body, subject) {
   const box = await waitForSelector(["div[role='textbox']", '.msg-form__contenteditable'], 20000);
   if (!box) {
-    throw new Error('Could not open the message composer.');
+    throw new Error(`Could not open the message composer. ${describePage()} Textboxes: ${describeTextboxes()}`);
   }
 
   box.focus();
@@ -119,8 +110,79 @@ async function fillComposerAndSend(body, subject) {
   return { sent: true };
 }
 
+// A real "Message" action on a profile - deliberately excludes the global "Messaging" nav link.
+function isMessageControl(el) {
+  const text = (el.innerText || '').trim().toLowerCase();
+  const label = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+
+  if (text === 'messaging' || label === 'messaging') {
+    return false;
+  }
+
+  if (text === 'message' || label === 'message') {
+    return true;
+  }
+
+  // e.g. aria-label="Message Jane Doe"
+  if (label.startsWith('message ')) {
+    return true;
+  }
+
+  return text === 'inmail' || label.includes('inmail');
+}
+
+async function waitForMessageButton(timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    let best = null;
+    for (const el of document.querySelectorAll('button, a')) {
+      if (!isVisible(el) || !isMessageControl(el)) {
+        continue;
+      }
+
+      const inTopCard = el.closest('.pv-top-card, .pv-top-card-v2-ctas, .pv-top-card--list, main') ? 2 : 1;
+      if (!best || inTopCard > best.score) {
+        best = { el, score: inTopCard };
+      }
+      if (best.score === 2) {
+        break;
+      }
+    }
+
+    if (best) {
+      return best.el;
+    }
+
+    await sleep(300);
+  }
+
+  return null;
+}
+
+async function waitForConnectButton(timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const el of document.querySelectorAll('button, a')) {
+      if (!isVisible(el)) {
+        continue;
+      }
+      const text = (el.innerText || '').trim().toLowerCase();
+      const label = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+      if (text === 'connect' || label === 'connect' || label.startsWith('invite ') || label.startsWith('connect ')) {
+        return el;
+      }
+    }
+    await sleep(300);
+  }
+  return null;
+}
+
 function isAuthWall() {
   return !!document.querySelector('#username') || /\/login|\/authwall|\/checkpoint/.test(location.pathname);
+}
+
+function describePage() {
+  return `url=${location.href} title="${document.title}"`;
 }
 
 // Used in error messages so we can see what the page actually contains.
@@ -139,6 +201,27 @@ function describeVisibleButtons() {
       seen.push(value);
     }
     if (seen.length >= 18) {
+      break;
+    }
+  }
+
+  return seen.join(' | ') || '(none)';
+}
+
+function describeTextboxes() {
+  const nodes = document.querySelectorAll("[role='textbox'], [contenteditable='true'], textarea, input");
+  const seen = [];
+  for (const el of nodes) {
+    if (!isVisible(el)) {
+      continue;
+    }
+
+    const cls = typeof el.className === 'string' && el.className ? '.' + el.className.split(' ')[0].slice(0, 24) : '';
+    const value = `${el.tagName.toLowerCase()}${cls}`;
+    if (!seen.includes(value)) {
+      seen.push(value);
+    }
+    if (seen.length >= 12) {
       break;
     }
   }

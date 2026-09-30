@@ -85,40 +85,88 @@ async function processItem(apiUrl, token, item) {
 
 function sendViaTab(url, payload) {
   return new Promise((resolve) => {
-    chrome.tabs.create({ url, active: false }, (tab) => {
-      const tabId = tab.id;
-      let settled = false;
+    let settled = false;
+    let profileTabId = null;
+    let onUpdated = null;
+    let onCreated = null;
+    const extraTabIds = [];
 
-      const finish = (value) => {
-        if (settled) {
+    const finish = (value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onCreated.removeListener(onCreated);
+
+      for (const id of [profileTabId, ...extraTabIds]) {
+        if (typeof id === 'number') {
+          chrome.tabs.remove(id, () => void chrome.runtime.lastError);
+        }
+      }
+
+      resolve(value);
+    };
+
+    // LinkedIn sometimes opens the composer in a new tab. If that happens, fill it there.
+    onCreated = (tab) => {
+      if (settled || !tab.id || !/linkedin\.com/i.test(tab.url || '')) {
+        return;
+      }
+
+      const composerTabId = tab.id;
+      extraTabIds.push(composerTabId);
+
+      const onComposerUpdated = (id, info) => {
+        if (id !== composerTabId || info.status !== 'complete') {
           return;
         }
-        settled = true;
-        chrome.tabs.onUpdated.removeListener(onUpdated);
-        chrome.tabs.remove(tabId, () => void chrome.runtime.lastError);
-        resolve(value);
-      };
 
-      const onUpdated = (updatedId, info) => {
-        if (updatedId !== tabId || info.status !== 'complete') {
-          return;
-        }
-
-        chrome.tabs.onUpdated.removeListener(onUpdated);
-
-        // Give the single-page app a moment to render the profile actions.
+        chrome.tabs.onUpdated.removeListener(onComposerUpdated);
         setTimeout(() => {
-          chrome.tabs.sendMessage(tabId, { type: 'SEND_INMAIL', ...payload }, (response) => {
-            if (chrome.runtime.lastError) {
-              finish({ sent: false, error: chrome.runtime.lastError.message });
-            } else {
-              finish(response || { sent: false, error: 'No response from the page.' });
+          chrome.tabs.sendMessage(composerTabId, { type: 'FILL_COMPOSER', ...payload }, (response) => {
+            if (!chrome.runtime.lastError && response) {
+              finish(response);
             }
           });
-        }, 4000);
+        }, 3000);
       };
 
+      chrome.tabs.onUpdated.addListener(onComposerUpdated);
+    };
+
+    onUpdated = (updatedId, info) => {
+      if (updatedId !== profileTabId || info.status !== 'complete') {
+        return;
+      }
+
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+
+      // Give the single-page app a moment to render the profile actions.
+      setTimeout(() => {
+        chrome.tabs.sendMessage(profileTabId, { type: 'SEND_INMAIL', ...payload }, (response) => {
+          if (chrome.runtime.lastError) {
+            // The tab navigated (e.g. to the messaging composer) - try filling there.
+            setTimeout(() => {
+              chrome.tabs.sendMessage(profileTabId, { type: 'FILL_COMPOSER', ...payload }, (retry) => {
+                if (!chrome.runtime.lastError && retry) {
+                  finish(retry);
+                }
+              });
+            }, 4000);
+            return;
+          }
+
+          finish(response || { sent: false, error: 'No response from the page.' });
+        });
+      }, 4000);
+    };
+
+    chrome.tabs.create({ url, active: false }, (tab) => {
+      profileTabId = tab.id;
       chrome.tabs.onUpdated.addListener(onUpdated);
+      chrome.tabs.onCreated.addListener(onCreated);
       setTimeout(() => finish({ sent: false, error: 'Timed out waiting for LinkedIn.' }), 90000);
     });
   });
