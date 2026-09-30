@@ -1,6 +1,5 @@
 using AutoSourcing.Core.Enums;
 using AutoSourcing.Data;
-using AutoSourcing.Services.Email;
 using AutoSourcing.Services.Outreach;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -31,12 +30,10 @@ public class LinkedInQueueItem
 public class LinkedInQueueController : ControllerBase
 {
     private readonly AutoSourcingDbContext _dbContext;
-    private readonly IEmailTrackingService _emailTracking;
 
-    public LinkedInQueueController(AutoSourcingDbContext dbContext, IEmailTrackingService emailTracking)
+    public LinkedInQueueController(AutoSourcingDbContext dbContext)
     {
         _dbContext = dbContext;
-        _emailTracking = emailTracking;
     }
 
     [HttpGet]
@@ -68,7 +65,9 @@ public class LinkedInQueueController : ControllerBase
             CandidateName = $"{m.FirstName} {m.LastName}".Trim(),
             ProfileUrl = m.LinkedInUrl,
             Subject = m.Subject,
-            Body = _emailTracking.RewriteLinksInPlainText(HtmlToPlainText.Convert(m.Body), m.Id)
+            // No link tracking for LinkedIn: LinkedIn fetches links in messages, which produced
+            // false "clicked" events. InMails are plain text anyway.
+            Body = HtmlToPlainText.Convert(m.Body)
         }).ToList();
 
         return Ok(result);
