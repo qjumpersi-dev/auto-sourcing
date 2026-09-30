@@ -11,4 +11,10 @@ public class LinkedInOptions
     public int ActionTimeoutMs { get; set; } = 30000;
     public bool DryRun { get; set; } = false;
     public string? BrowserExecutablePath { get; set; }
+
+    // "Server": send LinkedIn inline (requires a browser on the API host).
+    // "Local": queue LinkedIn messages for a local worker to send from a machine with a browser.
+    public string Mode { get; set; } = "Server";
+
+    public bool IsLocalMode => string.Equals(Mode, "Local", StringComparison.OrdinalIgnoreCase);
 }

@@ -133,6 +133,12 @@ public class OutreachMessagesController : ControllerBase
         try
         {
             var result = await _outreachService.SendMessageAsync(message, cancellationToken);
+            if (result.Deferred)
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                return Ok(new { queued = true, message = "Queued for the local LinkedIn worker." });
+            }
+
             if (!result.Sent)
             {
                 return Ok(new { dryRun = true, message = result.Message });

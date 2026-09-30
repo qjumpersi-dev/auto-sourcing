@@ -7,6 +7,7 @@ using AutoSourcing.Services.LinkedIn;
 using AutoSourcing.Services.Rhetorik;
 using AutoSourcing.Services.Sms;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace AutoSourcing.Services.Outreach;
 
@@ -21,6 +22,7 @@ public class OutreachService : IOutreachService
     private readonly IRhetorikClient _rhetorikClient;
     private readonly ISmsService _smsService;
     private readonly ISenderProvider _senderProvider;
+    private readonly LinkedInOptions _linkedInOptions;
 
     public OutreachService(
         AutoSourcingDbContext dbContext,
@@ -31,7 +33,8 @@ public class OutreachService : IOutreachService
         IEmailTrackingService emailTracking,
         IRhetorikClient rhetorikClient,
         ISmsService smsService,
-        ISenderProvider senderProvider)
+        ISenderProvider senderProvider,
+        IOptions<LinkedInOptions> linkedInOptions)
     {
         _dbContext = dbContext;
         _personalization = personalization;
@@ -42,6 +45,7 @@ public class OutreachService : IOutreachService
         _rhetorikClient = rhetorikClient;
         _smsService = smsService;
         _senderProvider = senderProvider;
+        _linkedInOptions = linkedInOptions.Value;
     }
 
     public async Task<OutreachMessage> CreateDraftAsync(int leadId, int campaignId, string subjectTemplate, string bodyTemplate, OutreachChannel channel, CancellationToken cancellationToken = default)
@@ -171,6 +175,14 @@ public class OutreachService : IOutreachService
                 break;
 
             case OutreachChannel.LinkedIn:
+                if (_linkedInOptions.IsLocalMode)
+                {
+                    // Sending is delegated to a local worker (a machine with a browser and a LinkedIn session).
+                    message.Status = OutreachMessageStatus.Queued;
+                    message.ErrorMessage = null;
+                    return new MessageSendResult(false, null, Deferred: true);
+                }
+
                 if (string.IsNullOrWhiteSpace(message.Lead.LinkedInUrl))
                 {
                     throw new InvalidOperationException("Lead has no LinkedIn URL.");
@@ -243,6 +255,7 @@ public class OutreachService : IOutreachService
             var failed = 0;
             var skipped = 0;
             var advanced = 0;
+            var deferred = 0;
 
             var messages = await _dbContext.OutreachMessages
                 .Where(m => m.CampaignId == campaignId)
@@ -335,6 +348,7 @@ public class OutreachService : IOutreachService
                     {
                         case SendOutcome.Sent: sent++; break;
                         case SendOutcome.Failed: failed++; break;
+                        case SendOutcome.Deferred: deferred++; break;
                         default: skipped++; break;
                     }
 
@@ -351,7 +365,7 @@ public class OutreachService : IOutreachService
             campaign.StartedAt ??= now;
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            return new CampaignRunResult(sent, failed, skipped, advanced);
+            return new CampaignRunResult(sent, failed, skipped, advanced, deferred);
         }
         finally
         {
@@ -473,7 +487,7 @@ public class OutreachService : IOutreachService
         return drafts.Count;
     }
 
-    private enum SendOutcome { Sent, Failed, Skipped }
+    private enum SendOutcome { Sent, Failed, Skipped, Deferred }
 
     private async Task FetchAndStoreLeadEmailsAsync(IReadOnlyCollection<Lead> leads, CancellationToken cancellationToken)
     {
@@ -544,6 +558,11 @@ public class OutreachService : IOutreachService
         try
         {
             var result = await SendMessageAsync(message, cancellationToken);
+            if (result.Deferred)
+            {
+                return SendOutcome.Deferred;
+            }
+
             return result.Sent ? SendOutcome.Sent : SendOutcome.Skipped;
         }
         catch (Exception ex)

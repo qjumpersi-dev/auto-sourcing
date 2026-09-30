@@ -446,6 +446,12 @@ export function CampaignDetailPage({
                       <Badge variant={messageVariant(message.status)}>
                         {messageStatusLabels[message.status]}
                       </Badge>
+                      {message.status === OutreachMessageStatus.Queued &&
+                        message.channel === OutreachChannel.LinkedIn && (
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            Waiting for the local LinkedIn worker
+                          </span>
+                        )}
                     </TableCell>
                     <TableCell>{formatDateTime(message.sentAt)}</TableCell>
                     <TableCell className="text-right">

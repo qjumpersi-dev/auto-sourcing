@@ -11,9 +11,9 @@ public interface IPersonalizationService
     IReadOnlyList<PersonalisationOption> GetOptions();
 }
 
-public record MessageSendResult(bool Sent, string? Message);
+public record MessageSendResult(bool Sent, string? Message, bool Deferred = false);
 
-public record CampaignRunResult(int Sent, int Failed, int Skipped, int Advanced);
+public record CampaignRunResult(int Sent, int Failed, int Skipped, int Advanced, int Deferred = 0);
 
 public interface IOutreachService
 {

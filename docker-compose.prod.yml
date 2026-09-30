@@ -43,6 +43,7 @@ services:
       - Microsoft__ClientSecret=${MICROSOFT_CLIENT_SECRET}
       - Microsoft__RedirectUri=${MICROSOFT_REDIRECT_URI}
       - Microsoft__AppBaseUrl=${MICROSOFT_APP_BASE_URL}
+      - LinkedIn__Mode=${LINKEDIN_MODE}
     depends_on:
       - sqlserver
 
