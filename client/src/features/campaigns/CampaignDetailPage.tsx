@@ -247,10 +247,16 @@ export function CampaignDetailPage({
         </p>
       )}
 
-      {linkedInStatus && !linkedInStatus.signedIn && linkedInStatus.available === false && (
+      {linkedInStatus && linkedInStatus.available === false && linkedInStatus.mode === 'Local' && (
         <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
-          LinkedIn InMail automation is not available in this environment, so LinkedIn steps will be
-          skipped or marked as failed. Email and SMS outreach still work.
+          LinkedIn steps are queued and sent by the LinkedIn worker or browser extension. Make sure it is
+          running and signed in to LinkedIn. Email and SMS outreach send normally.
+        </div>
+      )}
+
+      {linkedInStatus && linkedInStatus.available === false && linkedInStatus.mode !== 'Local' && (
+        <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          LinkedIn automation is not available in this environment. Email and SMS outreach still work.
         </div>
       )}
 

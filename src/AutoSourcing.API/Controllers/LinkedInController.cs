@@ -30,7 +30,8 @@ public class LinkedInController : ControllerBase
                 signedIn,
                 dryRun = _options.DryRun,
                 userDataDir = _options.UserDataDir,
-                available = true
+                available = true,
+                mode = _options.Mode
             });
         }
         catch (Exception ex)
@@ -42,6 +43,7 @@ public class LinkedInController : ControllerBase
                 dryRun = _options.DryRun,
                 userDataDir = _options.UserDataDir,
                 available = false,
+                mode = _options.Mode,
                 error = "LinkedIn automation is not available in this environment."
             });
         }

@@ -96,6 +96,7 @@ export interface LinkedInStatus {
   dryRun: boolean
   userDataDir: string
   available?: boolean
+  mode?: string
   error?: string | null
 }
 

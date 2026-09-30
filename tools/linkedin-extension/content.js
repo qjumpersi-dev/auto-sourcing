@@ -11,12 +11,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 async function handleSend({ body, subject }) {
+  // Give the profile page a moment to finish rendering, and nudge lazy sections.
+  await sleep(1500);
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  await sleep(500);
+
+  if (isAuthWall()) {
+    throw new Error('Not signed in to LinkedIn (a login screen was shown).');
+  }
+
   // Prefer a direct "Message"/"InMail" button on the profile.
-  const messageButton = await waitForButton([/^message$/i, /inmail/i], [
-    "[aria-label='Message']",
-    "[aria-label*='Message']",
-    "[aria-label*='InMail']",
-  ]);
+  const messageButton = await waitForButton(
+    [/message/i, /inmail/i],
+    [
+      "[aria-label='Message']",
+      "[aria-label*='Message']",
+      "[aria-label*='InMail']",
+      "button.artdeco-button--primary[aria-label*='essage']",
+    ],
+    20000,
+  );
 
   if (messageButton) {
     await clickEl(messageButton);
@@ -24,7 +38,11 @@ async function handleSend({ body, subject }) {
   }
 
   // Otherwise try to Connect with a note.
-  const connectButton = await findTopCardConnect();
+  const connectButton = await waitForButton([/connect/i], [
+    "button[aria-label*='Connect']",
+    "a[aria-label*='Connect']",
+  ], 8000);
+
   if (connectButton) {
     await clickEl(connectButton);
 
@@ -32,7 +50,7 @@ async function handleSend({ body, subject }) {
       "div[role='menu'] button[aria-label*='Add a note']",
     ]);
     if (!addNote) {
-      throw new Error("Could not find the 'Add a note' option after Connect.");
+      throw new Error(`Could not find 'Add a note'. Buttons: ${describeVisibleButtons()}`);
     }
 
     await clickEl(addNote);
@@ -62,11 +80,11 @@ async function handleSend({ body, subject }) {
     return { sent: true };
   }
 
-  throw new Error('No Message or Connect button found on this profile.');
+  throw new Error(`No Message or Connect button found on this profile. Buttons seen: ${describeVisibleButtons()}`);
 }
 
 async function fillComposerAndSend(body, subject) {
-  const box = await waitForSelector(["div[role='textbox']", '.msg-form__contenteditable']);
+  const box = await waitForSelector(["div[role='textbox']", '.msg-form__contenteditable'], 20000);
   if (!box) {
     throw new Error('Could not open the message composer.');
   }
@@ -88,30 +106,40 @@ async function fillComposerAndSend(body, subject) {
     "button[aria-label*='Send now']",
     "button[aria-label*='Send']",
     '.msg-form__send-button',
-  ]);
+  ], 20000);
   if (!send) {
-    throw new Error('Could not find the Send button.');
+    throw new Error(`Could not find the Send button. Buttons: ${describeVisibleButtons()}`);
   }
 
   await clickEl(send);
   return { sent: true };
 }
 
-async function findTopCardConnect() {
-  const title = document.title || '';
-  const name = title.includes(' | ') ? title.split(' | ')[0].trim() : '';
-  if (!name) {
-    return null;
+function isAuthWall() {
+  return !!document.querySelector('#username') || /\/login|\/authwall|\/checkpoint/.test(location.pathname);
+}
+
+// Used in error messages so we can see what the page actually contains.
+function describeVisibleButtons() {
+  const nodes = document.querySelectorAll('button, a, [role=button]');
+  const seen = [];
+  for (const el of nodes) {
+    if (!isVisible(el)) {
+      continue;
+    }
+
+    const label = (el.getAttribute('aria-label') || '').trim();
+    const text = (el.innerText || '').trim().replace(/\s+/g, ' ');
+    const value = (text || label).slice(0, 28);
+    if (value && !seen.includes(value)) {
+      seen.push(value);
+    }
+    if (seen.length >= 18) {
+      break;
+    }
   }
 
-  return waitForButton(
-    [],
-    [
-      `a[aria-label*='${name}'][aria-label*='connect' i]`,
-      `button[aria-label*='${name}'][aria-label*='connect' i]`,
-    ],
-    8000,
-  );
+  return seen.join(' | ') || '(none)';
 }
 
 function sleep(ms) {

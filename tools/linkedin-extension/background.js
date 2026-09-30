@@ -115,7 +115,7 @@ function sendViaTab(url, payload) {
               finish(response || { sent: false, error: 'No response from the page.' });
             }
           });
-        }, 2500);
+        }, 4000);
       };
 
       chrome.tabs.onUpdated.addListener(onUpdated);
