@@ -28,8 +28,17 @@ async function handleSend({ body, subject }) {
     throw new Error('Not signed in to LinkedIn (a login screen was shown).');
   }
 
-  // Prefer a direct "Message"/"InMail" control on the profile (not the "Messaging" nav link).
-  const messageButton = await waitForMessageButton(20000);
+  // The profile "Message" action is a link to the messaging composer - follow it directly.
+  // (Clicking it programmatically doesn't reliably trigger LinkedIn's own handler.)
+  const messageHref = await waitForMessageHref(15000);
+  if (messageHref) {
+    location.assign(messageHref);
+    // Let the navigation tear this context down; the background fills the composer on the new page.
+    return await new Promise(() => {});
+  }
+
+  // Fallback: a real click, for profiles where the action isn't a link.
+  const messageButton = await waitForMessageButton(15000);
   if (messageButton) {
     await clickEl(messageButton);
     await sleep(3000);
@@ -76,7 +85,20 @@ async function handleSend({ body, subject }) {
     return { sent: true };
   }
 
-  throw new Error(`No Message or Connect button found. ${describePage()} Buttons: ${describeVisibleButtons()}`);
+  throw new Error(
+    `No Message or Connect button found. ${describePage()} MessagingLinks: ${describeMessagingLinks()} Buttons: ${describeVisibleButtons()}`,
+  );
+}
+
+function describeMessagingLinks() {
+  const links = [];
+  for (const el of document.querySelectorAll('a[href*="/messaging/"]')) {
+    links.push((el.getAttribute('href') || '').slice(0, 70));
+    if (links.length >= 5) {
+      break;
+    }
+  }
+  return links.join(' | ') || '(none)';
 }
 
 async function fillComposerAndSend(body, subject, afterClickSnapshot) {
@@ -132,6 +154,37 @@ function isMessageControl(el) {
   }
 
   return text === 'inmail' || label.includes('inmail');
+}
+
+// Finds the profile's "Message" link, which points at the messaging composer.
+async function waitForMessageHref(timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const el of document.querySelectorAll('a[href]')) {
+      const href = el.getAttribute('href') || '';
+      if (!href.includes('/messaging/')) {
+        continue;
+      }
+      if (!isVisible(el)) {
+        continue;
+      }
+
+      const text = (el.innerText || '').trim().toLowerCase();
+      const label = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+      if (text === 'messaging' || label === 'messaging') {
+        continue; // the global nav, not a compose action
+      }
+
+      const isCompose = href.includes('thread/new') || href.includes('compose') || isMessageControl(el);
+      if (isCompose) {
+        return new URL(href, location.origin).toString();
+      }
+    }
+
+    await sleep(300);
+  }
+
+  return null;
 }
 
 async function waitForMessageButton(timeoutMs) {
