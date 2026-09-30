@@ -569,6 +569,7 @@ public class LeadsController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new { updated });
     }
+    [HttpPatch("{id:int}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateLeadStatusRequest request, CancellationToken cancellationToken)
     {
         var lead = await _dbContext.Leads.FindAsync([id], cancellationToken);
