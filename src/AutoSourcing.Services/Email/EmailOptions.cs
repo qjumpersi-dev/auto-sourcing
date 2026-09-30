@@ -13,4 +13,7 @@ public class EmailOptions
     public bool EnableSsl { get; set; } = true;
     public string PublicBaseUrl { get; set; } = "http://localhost:5000";
     public int TimeoutMs { get; set; } = 30000;
+
+    // Used to sign links in outbound email (unsubscribe etc.). Falls back to the API key when empty.
+    public string SigningKey { get; set; } = string.Empty;
 }

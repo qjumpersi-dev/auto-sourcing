@@ -1,5 +1,6 @@
 using AutoSourcing.Core.Enums;
 using AutoSourcing.Data;
+using AutoSourcing.Services.Email;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AutoSourcing.API.Controllers;
@@ -9,19 +10,31 @@ namespace AutoSourcing.API.Controllers;
 public class UnsubscribeController : ControllerBase
 {
     private readonly AutoSourcingDbContext _dbContext;
+    private readonly IUnsubscribeService _unsubscribeService;
 
-    public UnsubscribeController(AutoSourcingDbContext dbContext)
+    public UnsubscribeController(AutoSourcingDbContext dbContext, IUnsubscribeService unsubscribeService)
     {
         _dbContext = dbContext;
+        _unsubscribeService = unsubscribeService;
     }
 
-    // GET must NOT change state: email clients and security scanners prefetch links,
-    // which would otherwise opt people out without them clicking anything.
+    // Old token-less links are no longer accepted.
     [HttpGet("{leadId:int}")]
-    public async Task<ContentResult> Confirm(int leadId, CancellationToken cancellationToken)
-    {
-        var lead = await _dbContext.Leads.FindAsync([leadId], cancellationToken);
+    public ContentResult Legacy(int leadId) =>
+        Content(
+            Page("Unsubscribe", "<p>This unsubscribe link is out of date. Please use the link in the most recent email we sent you.</p>"),
+            "text/html");
 
+    // GET must NOT change state: email clients and security scanners prefetch links.
+    [HttpGet("{leadId:int}/{token}")]
+    public async Task<ContentResult> Confirm(int leadId, string token, CancellationToken cancellationToken)
+    {
+        if (!_unsubscribeService.ValidateToken(leadId, token))
+        {
+            return Content(Page("Unsubscribe", "<p>This unsubscribe link is not valid.</p>"), "text/html");
+        }
+
+        var lead = await _dbContext.Leads.FindAsync([leadId], cancellationToken);
         if (lead is null)
         {
             return Content(Page("Unsubscribe", "<p>This unsubscribe link is not valid.</p>"), "text/html");
@@ -36,16 +49,21 @@ public class UnsubscribeController : ControllerBase
 
         var form =
             "<p>Click the button below to stop receiving outreach emails from us.</p>" +
-            $"<form method=\"post\" action=\"/api/unsubscribe/{leadId}\">" +
+            $"<form method=\"post\" action=\"/api/unsubscribe/{leadId}/{token}\">" +
             "<button type=\"submit\" style=\"background:#2563eb;color:#fff;border:0;border-radius:6px;padding:10px 18px;font-size:15px;cursor:pointer;\">Unsubscribe</button>" +
             "</form>";
 
         return Content(Page("Unsubscribe", form), "text/html");
     }
 
-    [HttpPost("{leadId:int}")]
-    public async Task<ContentResult> Unsubscribe(int leadId, CancellationToken cancellationToken)
+    [HttpPost("{leadId:int}/{token}")]
+    public async Task<ContentResult> Unsubscribe(int leadId, string token, CancellationToken cancellationToken)
     {
+        if (!_unsubscribeService.ValidateToken(leadId, token))
+        {
+            return Content(Page("Unsubscribe", "<p>This unsubscribe link is not valid.</p>"), "text/html");
+        }
+
         var lead = await _dbContext.Leads.FindAsync([leadId], cancellationToken);
         if (lead is not null && lead.Status != LeadStatus.OptedOut)
         {

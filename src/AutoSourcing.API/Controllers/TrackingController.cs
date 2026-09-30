@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text.Json;
 using AutoSourcing.Data;
 using AutoSourcing.Services.Email;
 using Microsoft.AspNetCore.Mvc;
@@ -33,34 +35,29 @@ public class TrackingController : ControllerBase
         return File(TransparentGif, "image/gif");
     }
 
-    [HttpGet("click/{messageId:int}/{token}")]
-    public async Task<IActionResult> TrackClickToken(int messageId, string token, CancellationToken cancellationToken)
+    // A click is only recorded when a real browser renders this page and runs the beacon.
+    // Link scanners prefetch URLs but don't run JavaScript, so they no longer create false clicks.
+    [HttpGet("go/{messageId:int}/{token}")]
+    public IActionResult Go(int messageId, string token)
     {
-        await RecordClickAsync(messageId, cancellationToken);
-
         var url = UrlToken.Decode(token);
-        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var target))
-        {
-            return BadRequest();
-        }
+        return RedirectPage(messageId, url);
+    }
 
-        return Redirect(target.AbsoluteUri);
+    // Kept so links in already-sent emails behave the same way.
+    [HttpGet("click/{messageId:int}/{token}")]
+    public IActionResult TrackClickToken(int messageId, string token)
+    {
+        var url = UrlToken.Decode(token);
+        return RedirectPage(messageId, url);
     }
 
     [HttpGet("click/{messageId:int}")]
-    public async Task<IActionResult> TrackClick(int messageId, [FromQuery] string? url, CancellationToken cancellationToken)
-    {
-        await RecordClickAsync(messageId, cancellationToken);
+    public IActionResult TrackClick(int messageId, [FromQuery] string? url) => RedirectPage(messageId, url);
 
-        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var target))
-        {
-            return BadRequest();
-        }
-
-        return Redirect(target.AbsoluteUri);
-    }
-
-    private async Task RecordClickAsync(int messageId, CancellationToken cancellationToken)
+    // Called by the redirect page's JavaScript only.
+    [HttpPost("confirm/{messageId:int}")]
+    public async Task<IActionResult> ConfirmClick(int messageId, CancellationToken cancellationToken)
     {
         var message = await _dbContext.OutreachMessages.FindAsync([messageId], cancellationToken);
         if (message is not null && message.ClickedAt is null)
@@ -68,5 +65,32 @@ public class TrackingController : ControllerBase
             message.ClickedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
+
+        return NoContent();
+    }
+
+    private IActionResult RedirectPage(int messageId, string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var target))
+        {
+            return BadRequest();
+        }
+
+        var href = WebUtility.HtmlEncode(target.AbsoluteUri);
+        var jsonUrl = JsonSerializer.Serialize(target.AbsoluteUri);
+
+        var html =
+            "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\" />" +
+            "<meta name=\"robots\" content=\"noindex\" /><title>Redirecting…</title></head>" +
+            "<body style=\"font-family:system-ui,-apple-system,sans-serif;padding:2rem;color:#6b7280;\">" +
+            "<p>Taking you to the link…</p>" +
+            $"<p><a href=\"{href}\">Continue</a></p>" +
+            "<script>(function(){" +
+            $"try{{fetch('/api/tracking/confirm/{messageId}',{{method:'POST',keepalive:true}});}}catch(e){{}}" +
+            $"location.replace({jsonUrl});" +
+            "})();</script>" +
+            "</body></html>";
+
+        return Content(html, "text/html");
     }
 }

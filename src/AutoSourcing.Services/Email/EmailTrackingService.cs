@@ -38,7 +38,7 @@ public partial class EmailTrackingService : IEmailTrackingService
                 return match.Value;
             }
 
-            var tracked = $"{baseUrl}/api/tracking/click/{messageId}/{UrlToken.Encode(url)}";
+            var tracked = $"{baseUrl}/api/tracking/go/{messageId}/{UrlToken.Encode(url)}";
             return $"href=\"{tracked}\"";
         });
     }
@@ -69,7 +69,7 @@ public partial class EmailTrackingService : IEmailTrackingService
                 return match.Value;
             }
 
-            return $"{baseUrl}/api/tracking/click/{messageId}/{UrlToken.Encode(value)}{trailing}";
+            return $"{baseUrl}/api/tracking/go/{messageId}/{UrlToken.Encode(value)}{trailing}";
         });
     }
 

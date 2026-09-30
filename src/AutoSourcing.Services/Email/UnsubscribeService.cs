@@ -1,4 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
 using AutoSourcing.Core.Entities;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace AutoSourcing.Services.Email;
@@ -7,20 +10,24 @@ public interface IUnsubscribeService
 {
     string AppendFooter(string body, Lead lead);
     IReadOnlyDictionary<string, string> BuildHeaders(Lead lead);
+    string BuildUnsubscribeUrl(int leadId);
+    bool ValidateToken(int leadId, string? token);
 }
 
 public class UnsubscribeService : IUnsubscribeService
 {
     private readonly EmailOptions _options;
+    private readonly IConfiguration _configuration;
 
-    public UnsubscribeService(IOptions<EmailOptions> options)
+    public UnsubscribeService(IOptions<EmailOptions> options, IConfiguration configuration)
     {
         _options = options.Value;
+        _configuration = configuration;
     }
 
     public string AppendFooter(string body, Lead lead)
     {
-        var unsubscribeUrl = BuildUnsubscribeUrl(lead);
+        var unsubscribeUrl = BuildUnsubscribeUrl(lead.Id);
         var consentUrl = BuildConsentUrl(lead);
         var agentUrl = BuildAgentUrl(lead);
         var footer =
@@ -43,7 +50,7 @@ public class UnsubscribeService : IUnsubscribeService
 
     public IReadOnlyDictionary<string, string> BuildHeaders(Lead lead)
     {
-        var url = BuildUnsubscribeUrl(lead);
+        var url = BuildUnsubscribeUrl(lead.Id);
         return new Dictionary<string, string>
         {
             ["List-Unsubscribe"] = $"<{url}>",
@@ -51,21 +58,31 @@ public class UnsubscribeService : IUnsubscribeService
         };
     }
 
-    private string BuildUnsubscribeUrl(Lead lead)
+    // Signed so the lead id alone can't be used to unsubscribe someone.
+    public string BuildUnsubscribeUrl(int leadId)
     {
-        var baseUrl = (_options.PublicBaseUrl ?? string.Empty).TrimEnd('/');
-        return $"{baseUrl}/api/unsubscribe/{lead.Id}";
+        var token = SignedToken.Create("unsubscribe", leadId.ToString(), SigningKey);
+        return $"{Base}/api/unsubscribe/{leadId}/{token}";
     }
 
-    private string BuildConsentUrl(Lead lead)
+    public bool ValidateToken(int leadId, string? token)
+        => SignedToken.Verify("unsubscribe", leadId.ToString(), token, SigningKey);
+
+    private byte[] SigningKey
     {
-        var baseUrl = (_options.PublicBaseUrl ?? string.Empty).TrimEnd('/');
-        return $"{baseUrl}/api/consent/{lead.Id}";
+        get
+        {
+            var secret = !string.IsNullOrWhiteSpace(_options.SigningKey)
+                ? _options.SigningKey
+                : _configuration["ApiKey"] ?? "autosourcing-dev-signing-key";
+
+            return SHA256.HashData(Encoding.UTF8.GetBytes(secret));
+        }
     }
 
-    private string BuildAgentUrl(Lead lead)
-    {
-        var baseUrl = (_options.PublicBaseUrl ?? string.Empty).TrimEnd('/');
-        return $"{baseUrl}/api/agent/{lead.Id}";
-    }
+    private string BuildConsentUrl(Lead lead) => $"{Base}/api/consent/{lead.Id}";
+
+    private string BuildAgentUrl(Lead lead) => $"{Base}/api/agent/{lead.Id}";
+
+    private string Base => (_options.PublicBaseUrl ?? string.Empty).TrimEnd('/');
 }

@@ -16,7 +16,7 @@ public class EmailTrackingServiceTests
 
         var result = sut.RewriteLinks("<a href=\"https://example.com/page?a=1&b=2\">link</a>", 42);
 
-        Assert.Contains("href=\"https://app.test/api/tracking/click/42/", result);
+        Assert.Contains("href=\"https://app.test/api/tracking/go/42/", result);
         Assert.DoesNotContain("?url=", result);
     }
 
@@ -31,7 +31,7 @@ public class EmailTrackingServiceTests
 
         Assert.Contains("href=\"https://app.test/api/unsubscribe/7\"", result);
         Assert.Contains("href=\"mailto:hi@example.com\"", result);
-        Assert.DoesNotContain("/api/tracking/click/42", result);
+        Assert.DoesNotContain("/api/tracking/go/42", result);
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class EmailTrackingServiceTests
 
         var result = sut.RewriteLinksInPlainText("Click the link https://example.com/job/9", 42);
 
-        Assert.Contains("https://app.test/api/tracking/click/42/", result);
+        Assert.Contains("https://app.test/api/tracking/go/42/", result);
         Assert.DoesNotContain("?url=", result);
     }
 
@@ -64,7 +64,7 @@ public class EmailTrackingServiceTests
             "A https://app.test/api/tracking/click/7/abc and https://app.test/api/unsubscribe/7",
             42);
 
-        Assert.DoesNotContain("/api/tracking/click/42/", result);
+        Assert.DoesNotContain("/api/tracking/go/42/", result);
     }
 
     [Fact]
@@ -74,6 +74,6 @@ public class EmailTrackingServiceTests
 
         var result = sut.RewriteLinksInPlainText("See https://example.com/job.", 42);
 
-        Assert.EndsWith($"/api/tracking/click/42/{UrlToken.Encode("https://example.com/job")}.", result);
+        Assert.EndsWith($"/api/tracking/go/42/{UrlToken.Encode("https://example.com/job")}.", result);
     }
 }
