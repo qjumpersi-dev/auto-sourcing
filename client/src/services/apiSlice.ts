@@ -97,6 +97,9 @@ export const apiSlice = createApi({
     disconnectMicrosoft: builder.mutation<{ connected: boolean }, void>({
       query: () => ({ url: '/auth/microsoft/disconnect', method: 'POST' }),
     }),
+    createExtensionCode: builder.mutation<{ code: string; expiresInMinutes: number }, void>({
+      query: () => ({ url: '/auth/extension/code', method: 'POST' }),
+    }),
     getLeads: builder.query<
       PaginatedLeads,
       {
@@ -360,6 +363,7 @@ export const {
   useGetMicrosoftStatusQuery,
   useLazyGetMicrosoftConnectUrlQuery,
   useDisconnectMicrosoftMutation,
+  useCreateExtensionCodeMutation,
   useGetLeadsQuery,
   useSearchRhetorikMutation,
   useGenerateSearchSpecMutation,

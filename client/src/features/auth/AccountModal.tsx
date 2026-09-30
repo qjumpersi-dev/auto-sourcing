@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { Loader2, Save, Send, X } from 'lucide-react'
 import {
+  useCreateExtensionCodeMutation,
   useDisconnectMicrosoftMutation,
   useGetMicrosoftStatusQuery,
   useLazyGetMicrosoftConnectUrlQuery,
@@ -21,6 +22,9 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
   const { data: microsoft, refetch: refetchMicrosoft } = useGetMicrosoftStatusQuery()
   const [fetchConnectUrl, { isLoading: connecting }] = useLazyGetMicrosoftConnectUrlQuery()
   const [disconnectMicrosoft, { isLoading: disconnecting }] = useDisconnectMicrosoftMutation()
+  const [createExtensionCode, { isLoading: creatingCode }] = useCreateExtensionCodeMutation()
+  const [extensionCode, setExtensionCode] = useState<string | null>(null)
+  const [extensionError, setExtensionError] = useState<string | null>(null)
 
   const [displayName, setDisplayName] = useState(user.displayName)
   const [sendFromName, setSendFromName] = useState(user.sendFromName ?? '')
@@ -50,6 +54,16 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
       refetchMicrosoft()
     } catch {
       setMicrosoftError('Could not disconnect Microsoft 365.')
+    }
+  }
+
+  const onGenerateExtensionCode = async () => {
+    setExtensionError(null)
+    try {
+      const result = await createExtensionCode().unwrap()
+      setExtensionCode(result.code)
+    } catch {
+      setExtensionError('Could not generate a code. Make sure you are signed in.')
     }
   }
 
@@ -201,6 +215,31 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
               </>
             )}
             {microsoftError && <p className="mt-2 text-sm text-destructive">{microsoftError}</p>}
+          </div>
+
+          <div className="rounded-md border p-3">
+            <p className="text-sm font-medium">LinkedIn extension</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Install the <strong>AITS LinkedIn Sender</strong> browser extension, then paste a connect code
+              into it to link your LinkedIn session. Queued InMails are then sent from your own browser.
+            </p>
+            {extensionCode && (
+              <div className="mt-2">
+                <p className="text-xs text-muted-foreground">Connect code (valid for 10 minutes):</p>
+                <p className="font-mono text-lg font-semibold tracking-[0.2em]">{extensionCode}</p>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={onGenerateExtensionCode}
+              disabled={creatingCode}
+            >
+              {creatingCode ? <Loader2 className="animate-spin" /> : null}
+              {extensionCode ? 'Generate a new code' : 'Generate connect code'}
+            </Button>
+            {extensionError && <p className="mt-2 text-sm text-destructive">{extensionError}</p>}
           </div>
 
           <div className="rounded-md border p-3">

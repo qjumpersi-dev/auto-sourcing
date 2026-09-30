@@ -16,6 +16,7 @@ public interface IAuthService
     Task<AuthResult> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
     Task<User?> ResolveAsync(string token, CancellationToken cancellationToken = default);
     Task LogoutAsync(string token, CancellationToken cancellationToken = default);
+    Task<string> IssueTokenAsync(User user, TimeSpan lifetime, CancellationToken cancellationToken = default);
 }
 
 public class AuthService : IAuthService
@@ -112,19 +113,25 @@ public class AuthService : IAuthService
 
     private async Task<AuthResult> IssueSessionAsync(User user, CancellationToken cancellationToken)
     {
+        var token = await IssueTokenAsync(user, SessionLifetime, cancellationToken);
+        return new AuthResult(true, token, user, null);
+    }
+
+    public async Task<string> IssueTokenAsync(User user, TimeSpan lifetime, CancellationToken cancellationToken = default)
+    {
         var token = GenerateToken();
 
         _dbContext.UserSessions.Add(new UserSession
         {
             UserId = user.Id,
             TokenHash = HashToken(token),
-            ExpiresAt = DateTime.UtcNow.Add(SessionLifetime)
+            ExpiresAt = DateTime.UtcNow.Add(lifetime)
         });
 
         user.LastLoginAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return new AuthResult(true, token, user, null);
+        return token;
     }
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
