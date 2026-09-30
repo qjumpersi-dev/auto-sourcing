@@ -50,7 +50,7 @@ async function handleSend({ body, subject }) {
       "div[role='menu'] button[aria-label*='Add a note']",
     ]);
     if (!addNote) {
-      throw new Error(`Could not find 'Add a note'. Buttons: ${describeVisibleButtons()}`);
+      throw new Error(`Could not find 'Add a note'. ${describePage()} Buttons: ${describeVisibleButtons()}`);
     }
 
     await clickEl(addNote);
@@ -80,7 +80,11 @@ async function handleSend({ body, subject }) {
     return { sent: true };
   }
 
-  throw new Error(`No Message or Connect button found on this profile. Buttons seen: ${describeVisibleButtons()}`);
+  throw new Error(`No Message or Connect button found. ${describePage()} Buttons: ${describeVisibleButtons()}`);
+}
+
+function describePage() {
+  return `url=${location.href} title="${document.title}"`;
 }
 
 async function fillComposerAndSend(body, subject) {
