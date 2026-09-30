@@ -34,6 +34,7 @@ services:
       - Sms__TwilioAuthToken=${TWILIO_AUTH_TOKEN}
       - Sms__FromNumber=${TWILIO_FROM_NUMBER}
       - Rhetorik__ApiKey=${RHETORIK_API_KEY}
+      - Rhetorik__RevealContactEmails=${RHETORIK_REVEAL_CONTACT_EMAILS:-false}
       - Scotty__ApiKey=${SCOTTY_API_KEY}
       - Scotty__RestChannelId=${SCOTTY_REST_CHANNEL_ID}
       - Scotty__WebRtcChannelId=${SCOTTY_WEBRTC_CHANNEL_ID}

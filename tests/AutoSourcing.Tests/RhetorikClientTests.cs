@@ -9,12 +9,17 @@ namespace AutoSourcing.Tests;
 
 public class RhetorikClientTests
 {
-    private static (RhetorikClient Client, FakeHttpMessageHandler Handler) CreateClient(string responseJson)
+    private static (RhetorikClient Client, FakeHttpMessageHandler Handler) CreateClient(string responseJson, bool revealContactEmails = false)
     {
         var handler = new FakeHttpMessageHandler(responseJson);
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.rhetorik360.io/") };
         var options = Substitute.For<IOptions<RhetorikOptions>>();
-        options.Value.Returns(new RhetorikOptions { BaseUrl = "https://api.rhetorik360.io/", ApiKey = "test-key" });
+        options.Value.Returns(new RhetorikOptions
+        {
+            BaseUrl = "https://api.rhetorik360.io/",
+            ApiKey = "test-key",
+            RevealContactEmails = revealContactEmails
+        });
         return (new RhetorikClient(httpClient, options), handler);
     }
 
@@ -87,7 +92,7 @@ public class RhetorikClientTests
             }
             """;
 
-        var (sut, handler) = CreateClient(json);
+        var (sut, handler) = CreateClient(json, revealContactEmails: true);
 
         var result = await sut.FetchContactEmailsAsync(new[] { "prof-abc-123" });
 
@@ -108,6 +113,18 @@ public class RhetorikClientTests
         Assert.Equal(2, data.Value.ProfileEmails.Count);
         Assert.Equal("jane.doe@gmail.com", data.Value.ProfileEmails[0].Email);
         Assert.Equal(1, data.Value.ProfileEmails[0].Priority);
+    }
+
+    [Fact]
+    public async Task FetchContactEmailsAsync_DoesNotCallRhetorik_WhenRevealDisabled()
+    {
+        // Contact-email reveal is paid; with it disabled we must not hit the API at all.
+        var (sut, handler) = CreateClient("""{ "results": [] }""");
+
+        var result = await sut.FetchContactEmailsAsync(new[] { "prof-abc-123" });
+
+        Assert.Empty(result);
+        Assert.Equal(0, handler.RequestCount);
     }
 
     [Fact]
@@ -328,9 +345,12 @@ public class RhetorikClientTests
     private sealed class FakeHttpMessageHandler(string responseJson, HttpStatusCode statusCode = HttpStatusCode.OK) : HttpMessageHandler
     {
         public JsonElement LastRequestBody { get; private set; } = default;
+        public int RequestCount { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            RequestCount++;
+
             if (request.Content is not null)
             {
                 var content = await request.Content.ReadAsStringAsync(cancellationToken);

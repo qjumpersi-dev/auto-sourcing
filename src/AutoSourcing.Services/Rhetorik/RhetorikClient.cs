@@ -15,14 +15,15 @@ public class RhetorikClient : IRhetorikClient
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _httpClient;
+    private readonly RhetorikOptions _options;
 
     public RhetorikClient(HttpClient httpClient, IOptions<RhetorikOptions> options)
     {
         _httpClient = httpClient;
-        var opts = options.Value;
-        _httpClient.BaseAddress ??= new Uri(opts.BaseUrl);
+        _options = options.Value;
+        _httpClient.BaseAddress ??= new Uri(_options.BaseUrl);
         _httpClient.DefaultRequestHeaders.Remove("X-Api-Key");
-        _httpClient.DefaultRequestHeaders.Add("X-Api-Key", opts.ApiKey);
+        _httpClient.DefaultRequestHeaders.Add("X-Api-Key", _options.ApiKey);
     }
 
     public async Task<ProfileSearchResponse> SearchProfilesAsync(ProfileSearchRequest request, CancellationToken cancellationToken = default)
@@ -32,6 +33,12 @@ public class RhetorikClient : IRhetorikClient
 
     public async Task<IReadOnlyDictionary<string, RhetorikContactEmailData>> FetchContactEmailsAsync(IReadOnlyCollection<string> profileIds, CancellationToken cancellationToken = default)
     {
+        // Contact-email discovery uses Rhetorik's paid "reveal_all_data". Never call it unless enabled.
+        if (!_options.RevealContactEmails)
+        {
+            return new Dictionary<string, RhetorikContactEmailData>();
+        }
+
         var ids = profileIds
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct()
