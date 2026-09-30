@@ -212,7 +212,7 @@ public class RhetorikClient : IRhetorikClient
             Company = TruncateNullable(currentExperience?.RawCompanyName ?? currentExperience?.CompanyName, 200),
             JobTitle = TruncateNullable(currentExperience?.JobTitle ?? p.Headline, 200),
             Location = TruncateNullable(BuildLocation(p.Address), 200),
-            LinkedInUrl = null,
+            LinkedInUrl = RhetorikSocialLinks.ExtractLinkedInUrl(p.SocialLinks),
             Source = Truncate($"Rhetorik:{ProfileSearchEndpoint}", 100),
             Profile = new LeadProfile
             {

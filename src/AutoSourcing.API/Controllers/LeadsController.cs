@@ -395,6 +395,11 @@ public class LeadsController : ControllerBase
                 existing.Phone = candidate.Phone;
                 changed = true;
             }
+            if (!string.IsNullOrWhiteSpace(candidate.LinkedInUrl) && string.IsNullOrWhiteSpace(existing.LinkedInUrl))
+            {
+                existing.LinkedInUrl = candidate.LinkedInUrl;
+                changed = true;
+            }
             if (changed)
             {
                 existing.UpdatedAt = DateTime.UtcNow;
@@ -531,6 +536,7 @@ public class LeadsController : ControllerBase
             lead.Company = TruncateNullable(currentExp?.RawCompanyName ?? currentExp?.CompanyName, 200) ?? lead.Company;
             lead.JobTitle = TruncateNullable(currentExp?.JobTitle ?? p.Headline, 200) ?? lead.JobTitle;
             lead.Location = TruncateNullable(BuildLocation(p.Address), 200) ?? lead.Location;
+            lead.LinkedInUrl = RhetorikSocialLinks.ExtractLinkedInUrl(p.SocialLinks) ?? lead.LinkedInUrl;
             lead.UpdatedAt = DateTime.UtcNow;
 
             var workExp = result.ResumeData?.Experiences?

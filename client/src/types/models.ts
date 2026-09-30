@@ -201,6 +201,7 @@ export interface RhetorikProfileResult {
       state?: string | null
       city?: string | null
     } | null
+    profile_social_links?: { name?: string | null; url?: string | null }[] | null
   } | null
   contact_data?: {
     contact_current_experiences?:

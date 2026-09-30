@@ -61,6 +61,17 @@ function jobTitle(r: EnrichedProfileSearchResponse['results'][number]): string |
   return exp?.job_title ?? r.profile_data?.profile_headline ?? null
 }
 
+function linkedInUrl(r: EnrichedProfileSearchResponse['results'][number]): string | null {
+  const link = r.profile_data?.profile_social_links?.find(
+    (l) =>
+      (l.name ?? '').toLowerCase().includes('linkedin') ||
+      (l.url ?? '').toLowerCase().includes('linkedin'),
+  )
+  const url = link?.url?.trim()
+  if (!url) return null
+  return url.startsWith('http') ? url : `https://${url.replace(/^\/+/, '')}`
+}
+
 export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearchRequest }) {
   const [searchRhetorik, { isLoading: searching }] = useSearchRhetorikMutation()
   const [generateSpec] = useGenerateSearchSpecMutation()
@@ -571,7 +582,7 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
                                 company: companyName(r),
                                 jobTitle: jobTitle(r),
                                 location: [pd.profile_address?.city, pd.profile_address?.country].filter(Boolean).join(', ') || null,
-                                linkedInUrl: null,
+                                linkedInUrl: linkedInUrl(r),
                                 source: '',
                                 externalId: null,
                                 status: 0,

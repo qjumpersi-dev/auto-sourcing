@@ -190,8 +190,20 @@ public class RhetorikProfileData
     [JsonPropertyName("profile_last_updated")]
     public string? LastUpdated { get; set; }
 
+    [JsonPropertyName("profile_social_links")]
+    public IReadOnlyList<RhetorikSocialLink>? SocialLinks { get; set; }
+
     [JsonPropertyName("profile_emails")]
     public IReadOnlyList<RhetorikProfileEmail>? ProfileEmails { get; set; }
+}
+
+public class RhetorikSocialLink
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
 }
 
 public class RhetorikEducation
