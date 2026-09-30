@@ -40,7 +40,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { formatDate, formatDateTime } from '@/lib/formatDate'
+import { formatDateTime } from '@/lib/formatDate'
 
 function messageVariant(status: number) {
   switch (status) {
@@ -526,7 +526,7 @@ function TrackingCell({ value }: { value: string | null }) {
   return (
     <span className="inline-flex items-center gap-1 text-emerald-600" title={formatDateTime(value)}>
       <Check className="h-4 w-4" />
-      <span className="text-xs text-muted-foreground">{formatDate(value)}</span>
+      <span className="text-xs text-muted-foreground">{formatDateTime(value)}</span>
     </span>
   )
 }

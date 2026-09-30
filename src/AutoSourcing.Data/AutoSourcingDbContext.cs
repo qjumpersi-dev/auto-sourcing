@@ -1,10 +1,23 @@
 using AutoSourcing.Core.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace AutoSourcing.Data;
 
 public class AutoSourcingDbContext : DbContext
 {
+    // SQL Server datetime2 doesn't store DateTimeKind, so values come back as Unspecified and were
+    // serialised without a "Z" - browsers then read UTC as local time. These keep everything UTC.
+    private static readonly ValueConverter<DateTime, DateTime> UtcDateTimeConverter = new(
+        v => v.Kind == DateTimeKind.Utc ? v : v.ToUniversalTime(),
+        v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+    private static readonly ValueConverter<DateTime?, DateTime?> UtcNullableDateTimeConverter = new(
+        v => v.HasValue
+            ? (v.Value.Kind == DateTimeKind.Utc ? v.Value : v.Value.ToUniversalTime())
+            : v,
+        v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
+
     public AutoSourcingDbContext(DbContextOptions<AutoSourcingDbContext> options) : base(options)
     {
     }
@@ -27,6 +40,22 @@ public class AutoSourcingDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Treat every DateTime as UTC so the API serialises them with a "Z" suffix.
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime))
+                {
+                    property.SetValueConverter(UtcDateTimeConverter);
+                }
+                else if (property.ClrType == typeof(DateTime?))
+                {
+                    property.SetValueConverter(UtcNullableDateTimeConverter);
+                }
+            }
+        }
 
         modelBuilder.Entity<Lead>(entity =>
         {
