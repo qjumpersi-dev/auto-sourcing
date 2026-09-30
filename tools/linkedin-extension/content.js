@@ -32,8 +32,9 @@ async function handleSend({ body, subject }) {
   const messageButton = await waitForMessageButton(20000);
   if (messageButton) {
     await clickEl(messageButton);
-    await sleep(2000);
-    return await fillComposerAndSend(body, subject);
+    await sleep(3000);
+    const afterClick = describeComposer();
+    return await fillComposerAndSend(body, subject, afterClick);
   }
 
   // Otherwise try to Connect with a note.
@@ -78,10 +79,12 @@ async function handleSend({ body, subject }) {
   throw new Error(`No Message or Connect button found. ${describePage()} Buttons: ${describeVisibleButtons()}`);
 }
 
-async function fillComposerAndSend(body, subject) {
+async function fillComposerAndSend(body, subject, afterClickSnapshot) {
   const box = await waitForComposer(30000);
   if (!box) {
-    throw new Error(`Could not open the message composer. ${describePage()} Candidates: ${describeComposer()}`);
+    throw new Error(
+      `Could not open the message composer. ${describePage()} AfterClick: ${afterClickSnapshot ?? '(n/a)'} Candidates: ${describeComposer()}`,
+    );
   }
 
   box.focus();
@@ -346,6 +349,18 @@ function isVisible(el) {
 async function clickEl(el) {
   el.scrollIntoView({ block: 'center' });
   await sleep(150);
+
+  // Some LinkedIn controls listen on pointer/mouse events rather than click.
+  const options = { bubbles: true, cancelable: true, view: window };
+  try {
+    el.dispatchEvent(new PointerEvent('pointerdown', options));
+    el.dispatchEvent(new MouseEvent('mousedown', options));
+    el.dispatchEvent(new PointerEvent('pointerup', options));
+    el.dispatchEvent(new MouseEvent('mouseup', options));
+  } catch {
+    // Older engines may not support PointerEvent; the click below still fires.
+  }
+
   el.click();
 }
 
