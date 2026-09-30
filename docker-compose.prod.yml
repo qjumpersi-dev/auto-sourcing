@@ -38,6 +38,7 @@ services:
       - Email__FromAddress=${SMTP_FROM_ADDRESS}
       - Email__FromName=${SMTP_FROM_NAME}
       - Email__EnableSsl=${SMTP_ENABLE_SSL}
+      - Email__SigningKey=${EMAIL_SIGNING_KEY:-}
       - Sms__TwilioAccountSid=${TWILIO_ACCOUNT_SID}
       - Sms__TwilioAuthToken=${TWILIO_AUTH_TOKEN}
       - Sms__FromNumber=${TWILIO_FROM_NUMBER}
