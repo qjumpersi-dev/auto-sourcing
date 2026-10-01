@@ -30,16 +30,12 @@ public partial class EmailTrackingService : IEmailTrackingService
         return HrefPattern().Replace(html, match =>
         {
             var url = match.Groups["url"].Value;
-            if (url.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) ||
-                url.Contains("/api/tracking/", StringComparison.OrdinalIgnoreCase) ||
-                url.Contains("/api/unsubscribe", StringComparison.OrdinalIgnoreCase) ||
-                url.Contains("/api/consent", StringComparison.OrdinalIgnoreCase))
+            if (url.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) || IsOurUrl(url, baseUrl))
             {
                 return match.Value;
             }
 
-            var tracked = $"{baseUrl}/api/tracking/go/{messageId}/{UrlToken.Encode(url)}";
-            return $"href=\"{tracked}\"";
+            return $"href=\"{ShortLink(baseUrl, messageId, url)}\"";
         });
     }
 
@@ -61,17 +57,23 @@ public partial class EmailTrackingService : IEmailTrackingService
                 value = value[..^1];
             }
 
-            if (value.Length == 0 ||
-                value.Contains("/api/tracking/", StringComparison.OrdinalIgnoreCase) ||
-                value.Contains("/api/unsubscribe", StringComparison.OrdinalIgnoreCase) ||
-                value.Contains("/api/consent", StringComparison.OrdinalIgnoreCase))
+            if (value.Length == 0 || IsOurUrl(value, baseUrl))
             {
                 return match.Value;
             }
 
-            return $"{baseUrl}/api/tracking/go/{messageId}/{UrlToken.Encode(value)}{trailing}";
+            return $"{ShortLink(baseUrl, messageId, value)}{trailing}";
         });
     }
+
+    private static bool IsOurUrl(string url, string baseUrl) =>
+        (!string.IsNullOrEmpty(baseUrl) && url.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase)) ||
+        url.Contains("/api/tracking/", StringComparison.OrdinalIgnoreCase) ||
+        url.Contains("/api/unsubscribe", StringComparison.OrdinalIgnoreCase) ||
+        url.Contains("/api/consent", StringComparison.OrdinalIgnoreCase);
+
+    private static string ShortLink(string baseUrl, int messageId, string url) =>
+        $"{baseUrl}/l/{messageId}/{UrlToken.ShortCode(url)}";
 
     public string BuildOpenPixel(int messageId)
     {

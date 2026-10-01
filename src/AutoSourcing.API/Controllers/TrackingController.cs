@@ -1,8 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using AutoSourcing.Data;
 using AutoSourcing.Services.Email;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AutoSourcing.API.Controllers;
 
@@ -116,6 +118,50 @@ public class TrackingController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    // Short link used in outbound email/messages (e.g. /l/12/7f3a91b2). The destination is looked
+    // up from the stored message body, so no extra storage is needed.
+    [HttpGet("/l/{messageId:int}/{code}")]
+    public async Task<IActionResult> ShortLink(int messageId, string code, CancellationToken cancellationToken)
+    {
+        var body = await _dbContext.OutreachMessages
+            .AsNoTracking()
+            .Where(m => m.Id == messageId)
+            .Select(m => m.Body)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (body is null)
+        {
+            return NotFound();
+        }
+
+        var url = ExtractUrls(body)
+            .FirstOrDefault(candidate => string.Equals(UrlToken.ShortCode(candidate), code, StringComparison.OrdinalIgnoreCase));
+
+        return url is null ? NotFound() : RedirectPage(messageId, url);
+    }
+
+    private static IEnumerable<string> ExtractUrls(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            yield break;
+        }
+
+        foreach (Match match in Regex.Matches(text, "https?://[^\\s<>\"']+", RegexOptions.IgnoreCase))
+        {
+            var value = match.Value;
+            while (value.Length > 0 && ".,;:!?)]}".Contains(value[^1]))
+            {
+                value = value[..^1];
+            }
+
+            if (value.Length > 0)
+            {
+                yield return value;
+            }
+        }
     }
 
     private IActionResult RedirectPage(int messageId, string? url)
