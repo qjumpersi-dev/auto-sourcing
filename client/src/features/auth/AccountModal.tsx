@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { Loader2, Save, Send, X } from 'lucide-react'
 import {
+  useChangePasswordMutation,
   useCreateExtensionCodeMutation,
   useDisconnectMicrosoftMutation,
   useGetMicrosoftStatusQuery,
@@ -25,6 +26,11 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
   const [createExtensionCode, { isLoading: creatingCode }] = useCreateExtensionCodeMutation()
   const [extensionCode, setExtensionCode] = useState<string | null>(null)
   const [extensionError, setExtensionError] = useState<string | null>(null)
+  const [changePassword, { isLoading: changingPassword }] = useChangePasswordMutation()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSaved, setPasswordSaved] = useState(false)
 
   const [displayName, setDisplayName] = useState(user.displayName)
   const [sendFromName, setSendFromName] = useState(user.sendFromName ?? '')
@@ -64,6 +70,20 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
       setExtensionCode(result.code)
     } catch {
       setExtensionError('Could not generate a code. Make sure you are signed in.')
+    }
+  }
+
+  const onChangePassword = async () => {
+    setPasswordError(null)
+    setPasswordSaved(false)
+    try {
+      await changePassword({ currentPassword, newPassword }).unwrap()
+      setPasswordSaved(true)
+      setCurrentPassword('')
+      setNewPassword('')
+    } catch (err) {
+      const data = (err as { data?: { error?: string } })?.data
+      setPasswordError(data?.error ?? 'Could not change your password.')
     }
   }
 
@@ -240,6 +260,43 @@ export function AccountModal({ user, onClose }: { user: AuthUser; onClose: () =>
               {extensionCode ? 'Generate a new code' : 'Generate connect code'}
             </Button>
             {extensionError && <p className="mt-2 text-sm text-destructive">{extensionError}</p>}
+          </div>
+
+          <div className="rounded-md border p-3">
+            <p className="text-sm font-medium">Change password</p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Current password</Label>
+                <Input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>New password</Label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+            {passwordError && <p className="mt-2 text-sm text-destructive">{passwordError}</p>}
+            {passwordSaved && <p className="mt-2 text-sm text-emerald-600">Password changed.</p>}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={onChangePassword}
+              disabled={changingPassword || !currentPassword || newPassword.length < 8}
+            >
+              {changingPassword ? <Loader2 className="animate-spin" /> : null}
+              Change password
+            </Button>
           </div>
 
           <div className="rounded-md border p-3">
