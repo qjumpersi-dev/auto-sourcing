@@ -42,7 +42,7 @@ public class UsersController : ControllerBase
     {
         if (!_currentUser.IsAdmin)
         {
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = "Only administrators can manage users." });
         }
 
         var users = await _dbContext.Users
@@ -69,7 +69,7 @@ public class UsersController : ControllerBase
     {
         if (!_currentUser.IsAdmin)
         {
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = "Only administrators can manage users." });
         }
 
         var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();
