@@ -147,14 +147,21 @@ public class OutreachService : IOutreachService
         switch (message.Channel)
         {
             case OutreachChannel.Email:
-                var recipients = message.Lead.Emails
-                    .Where(e => !string.IsNullOrWhiteSpace(e.Email))
-                    .Select(e => e.Email)
-                    .ToList();
+                // The lead's own email is the address the team maintains (and can edit), so it wins.
+                // Discovered contact emails are only a fallback when the lead has none.
+                var recipients = new List<string>();
 
-                if (recipients.Count == 0 && !string.IsNullOrWhiteSpace(message.Lead.Email))
+                if (!string.IsNullOrWhiteSpace(message.Lead.Email))
                 {
                     recipients.Add(message.Lead.Email);
+                }
+                else
+                {
+                    recipients.AddRange(message.Lead.Emails
+                        .Where(e => !string.IsNullOrWhiteSpace(e.Email))
+                        .OrderBy(e => e.Priority)
+                        .Select(e => e.Email)
+                        .Take(1));
                 }
 
                 if (recipients.Count == 0)
