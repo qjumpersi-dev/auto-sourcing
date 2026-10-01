@@ -569,6 +569,21 @@ public class LeadsController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new { updated });
     }
+    // Removes contact emails discovered from Rhetorik. Outreach always uses the lead's own email
+    // now, so these are no longer used for sending and are safe to clear.
+    [HttpDelete("discovered-emails")]
+    public async Task<ActionResult> ClearDiscoveredEmails(CancellationToken cancellationToken)
+    {
+        var emails = await _dbContext.LeadEmails.ToListAsync(cancellationToken);
+        if (emails.Count > 0)
+        {
+            _dbContext.LeadEmails.RemoveRange(emails);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return Ok(new { removed = emails.Count });
+    }
+
     [HttpPatch("{id:int}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateLeadStatusRequest request, CancellationToken cancellationToken)
     {
