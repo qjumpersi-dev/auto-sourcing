@@ -93,6 +93,17 @@ public class TrackingController : ControllerBase
         }
 
         var message = await _dbContext.OutreachMessages.FindAsync([messageId], cancellationToken);
+
+        // Scanners follow links within seconds of delivery; people don't.
+        if (message?.SentAt is { } sentAt && DateTime.UtcNow - sentAt < TimeSpan.FromSeconds(60))
+        {
+            _logger.LogInformation(
+                "Ignored tracking click for message {MessageId} (within 60s of send). UA: {UserAgent}",
+                messageId,
+                userAgent);
+            return NoContent();
+        }
+
         if (message is not null && message.ClickedAt is null)
         {
             message.ClickedAt = DateTime.UtcNow;
@@ -124,7 +135,10 @@ public class TrackingController : ControllerBase
             "<p>Taking you to the link…</p>" +
             $"<p><a href=\"{href}\">Continue</a></p>" +
             "<script>(function(){" +
-            $"try{{fetch('/api/tracking/confirm/{messageId}',{{method:'POST',keepalive:true}});}}catch(e){{}}" +
+            // Only a real browser counts: headless fetchers report webdriver/odd fingerprints.
+            "var real=false;try{real=!navigator.webdriver&&navigator.languages&&navigator.languages.length>0" +
+            "&&(navigator.hardwareConcurrency||0)>0&&navigator.plugins&&navigator.plugins.length>0;}catch(e){real=false;}" +
+            $"if(real){{try{{fetch('/api/tracking/confirm/{messageId}',{{method:'POST',keepalive:true}});}}catch(e){{}}}}" +
             $"location.replace({jsonUrl});" +
             "})();</script>" +
             "</body></html>";
