@@ -2,6 +2,7 @@ using AutoSourcing.API.Auth;
 using AutoSourcing.API.BackgroundServices;
 using AutoSourcing.API.Middleware;
 using AutoSourcing.API.Serialization;
+using AutoSourcing.Core.Abstractions;
 using AutoSourcing.Data;
 using AutoSourcing.Services.Agent;
 using AutoSourcing.Services.Auth;
@@ -37,6 +38,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<ICurrentUserContext, CurrentUserContext>();
 builder.Services.AddScoped<ISenderProvider, HttpContextSenderProvider>();
 
 builder.Services.Configure<RhetorikOptions>(builder.Configuration.GetSection(RhetorikOptions.SectionName));

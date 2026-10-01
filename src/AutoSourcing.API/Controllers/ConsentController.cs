@@ -76,7 +76,7 @@ public class ConsentController : ControllerBase
     [HttpPut]
     public async Task<ActionResult<LeadConsentResponse>> UpdateConsent(int leadId, [FromBody] ConsentUpdateRequest request, CancellationToken cancellationToken)
     {
-        var lead = await _dbContext.Leads.FindAsync([leadId], cancellationToken);
+        var lead = await _dbContext.Leads.FirstOrDefaultAsync(l => l.Id == leadId, cancellationToken);
         if (lead is null)
         {
             return NotFound();
@@ -122,7 +122,7 @@ public class ConsentController : ControllerBase
     [HttpPut("preferred-channel")]
     public async Task<IActionResult> SetPreferredChannel(int leadId, [FromBody] ConsentChannel? channel, CancellationToken cancellationToken)
     {
-        var lead = await _dbContext.Leads.FindAsync([leadId], cancellationToken);
+        var lead = await _dbContext.Leads.FirstOrDefaultAsync(l => l.Id == leadId, cancellationToken);
         if (lead is null)
         {
             return NotFound();

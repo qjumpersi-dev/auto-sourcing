@@ -1,3 +1,4 @@
+using AutoSourcing.Core.Abstractions;
 using AutoSourcing.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -6,6 +7,7 @@ namespace AutoSourcing.Data;
 
 public class AutoSourcingDbContext : DbContext
 {
+    private readonly ICurrentUserContext? _currentUser;
     // SQL Server datetime2 doesn't store DateTimeKind, so values come back as Unspecified and were
     // serialised without a "Z" - browsers then read UTC as local time. These keep everything UTC.
     private static readonly ValueConverter<DateTime, DateTime> UtcDateTimeConverter = new(
@@ -18,8 +20,41 @@ public class AutoSourcingDbContext : DbContext
             : v,
         v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
 
-    public AutoSourcingDbContext(DbContextOptions<AutoSourcingDbContext> options) : base(options)
+    public AutoSourcingDbContext(DbContextOptions<AutoSourcingDbContext> options, ICurrentUserContext? currentUser = null) : base(options)
     {
+        _currentUser = currentUser;
+    }
+
+    // Null when there's no signed-in user (background jobs, API-key calls) - filtering is then off.
+    public int? CurrentUserId => _currentUser?.UserId;
+
+    public override int SaveChanges()
+    {
+        AssignOwners();
+        return base.SaveChanges();
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        AssignOwners();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void AssignOwners()
+    {
+        var userId = _currentUser?.UserId;
+        if (userId is null)
+        {
+            return;
+        }
+
+        foreach (var entry in ChangeTracker.Entries<IOwnedEntity>().Where(e => e.State == EntityState.Added))
+        {
+            if (entry.Entity.UserId == 0)
+            {
+                entry.Entity.UserId = userId.Value;
+            }
+        }
     }
 
     public DbSet<Lead> Leads => Set<Lead>();
@@ -55,6 +90,33 @@ public class AutoSourcingDbContext : DbContext
                     property.SetValueConverter(UtcNullableDateTimeConverter);
                 }
             }
+        }
+
+        // Per-user data segregation: owned entities are filtered to the signed-in user. With no
+        // signed-in user (background jobs, API-key calls) filtering is off.
+        modelBuilder.Entity<Lead>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<Campaign>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<Sequence>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<SequenceStep>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<Job>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<OrganizationProfile>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<PolicyGuardrails>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<OutreachMessage>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<LeadEmail>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<ChannelConsent>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<ConversationMessage>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<LeadProfile>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+
+        foreach (var ownedType in new[]
+                 {
+                     typeof(Lead), typeof(Campaign), typeof(Sequence), typeof(SequenceStep), typeof(Job),
+                     typeof(OrganizationProfile), typeof(PolicyGuardrails), typeof(OutreachMessage),
+                     typeof(LeadEmail), typeof(ChannelConsent), typeof(ConversationMessage), typeof(LeadProfile)
+                 })
+        {
+            var ownedBuilder = modelBuilder.Entity(ownedType);
+            ownedBuilder.Property(nameof(IOwnedEntity.UserId)).IsRequired();
+            ownedBuilder.HasIndex(nameof(IOwnedEntity.UserId));
         }
 
         modelBuilder.Entity<Lead>(entity =>

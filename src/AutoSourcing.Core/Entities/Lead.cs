@@ -1,10 +1,12 @@
+using AutoSourcing.Core.Abstractions;
 using AutoSourcing.Core.Enums;
 
 namespace AutoSourcing.Core.Entities;
 
-public class Lead
+public class Lead : IOwnedEntity
 {
     public int Id { get; set; }
+    public int UserId { get; set; }
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;

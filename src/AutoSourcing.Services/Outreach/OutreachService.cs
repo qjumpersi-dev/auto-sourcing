@@ -610,7 +610,13 @@ public class OutreachService : IOutreachService
 
     private OutreachMessage BuildDraft(Lead lead, int campaignId, string subjectTemplate, string bodyTemplate, OutreachChannel channel, int? stepOrder)
     {
-        var orgName = _dbContext.OrganizationProfiles.AsNoTracking().FirstOrDefault()?.OrgName;
+        // Company data belongs to the user who owns the lead.
+        var orgName = _dbContext.OrganizationProfiles
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(o => o.UserId == lead.UserId)
+            .Select(o => o.OrgName)
+            .FirstOrDefault();
         var sender = _senderProvider.Current;
 
         return new OutreachMessage

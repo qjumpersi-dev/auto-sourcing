@@ -30,8 +30,8 @@ public interface ICandidateAgentService
 {
     Task<Lead?> ResolveLeadAsync(Guid conversationKey, CancellationToken cancellationToken = default);
     Task<CandidateContext?> GetContextAsync(Guid conversationKey, CancellationToken cancellationToken = default);
-    Task<string> GetCompanyInfoAsync(CancellationToken cancellationToken = default);
-    Task<string> GetGuardrailsAsync(CancellationToken cancellationToken = default);
+    Task<string> GetCompanyInfoAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default);
+    Task<string> GetGuardrailsAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default);
     Task SaveMessageAsync(int leadId, string role, string content, bool isEscalation = false, CancellationToken cancellationToken = default);
     Task<bool> EscalateAsync(Guid conversationKey, string reason, CancellationToken cancellationToken = default);
 }
@@ -66,8 +66,11 @@ public class CandidateAgentService : ICandidateAgentService
             return null;
         }
 
-        var org = await _dbContext.OrganizationProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
-        var policy = await _dbContext.PolicyGuardrails.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        // The agent is public (no signed-in user), so resolve the company data from the lead's owner.
+        var org = await _dbContext.OrganizationProfiles.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(o => o.UserId == lead.UserId, cancellationToken);
+        var policy = await _dbContext.PolicyGuardrails.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == lead.UserId, cancellationToken);
 
         return new CandidateContext(
             $"{lead.FirstName} {lead.LastName}".Trim(),
@@ -91,9 +94,9 @@ public class CandidateAgentService : ICandidateAgentService
         );
     }
 
-    public async Task<string> GetCompanyInfoAsync(CancellationToken cancellationToken = default)
+    public async Task<string> GetCompanyInfoAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default)
     {
-        var org = await _dbContext.OrganizationProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var org = await ResolveOrgAsync(conversationKey, cancellationToken);
         return $"""
             Company: {org?.OrgName ?? "—"}
             About: {StripHtml(org?.About) ?? "—"}
@@ -103,9 +106,9 @@ public class CandidateAgentService : ICandidateAgentService
             """;
     }
 
-    public async Task<string> GetGuardrailsAsync(CancellationToken cancellationToken = default)
+    public async Task<string> GetGuardrailsAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default)
     {
-        var policy = await _dbContext.PolicyGuardrails.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var policy = await ResolvePolicyAsync(conversationKey, cancellationToken);
         return $"""
             What you may answer: {StripHtml(policy?.WhatAiMayAnswer) ?? "—"}
             Escalate to a recruiter when: {StripHtml(policy?.EscalationTriggers) ?? "—"}
@@ -114,6 +117,44 @@ public class CandidateAgentService : ICandidateAgentService
             Market / geography rules: {StripHtml(policy?.MarketRules) ?? "—"}
             Needs human when: {StripHtml(policy?.NeedsHumanStates) ?? "—"}
             """;
+    }
+
+    // Company data belongs to the user who owns the candidate's campaign.
+    private async Task<int?> ResolveOwnerUserIdAsync(Guid? conversationKey, CancellationToken cancellationToken)
+    {
+        if (conversationKey is not { } key)
+        {
+            return null;
+        }
+
+        return await _dbContext.Leads
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(l => l.ConversationKey == key)
+            .Select(l => (int?)l.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<OrganizationProfile?> ResolveOrgAsync(Guid? conversationKey, CancellationToken cancellationToken)
+    {
+        if (await ResolveOwnerUserIdAsync(conversationKey, cancellationToken) is { } ownerUserId)
+        {
+            return await _dbContext.OrganizationProfiles.IgnoreQueryFilters().AsNoTracking()
+                .FirstOrDefaultAsync(o => o.UserId == ownerUserId, cancellationToken);
+        }
+
+        return await _dbContext.OrganizationProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<PolicyGuardrails?> ResolvePolicyAsync(Guid? conversationKey, CancellationToken cancellationToken)
+    {
+        if (await ResolveOwnerUserIdAsync(conversationKey, cancellationToken) is { } ownerUserId)
+        {
+            return await _dbContext.PolicyGuardrails.IgnoreQueryFilters().AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserId == ownerUserId, cancellationToken);
+        }
+
+        return await _dbContext.PolicyGuardrails.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task SaveMessageAsync(int leadId, string role, string content, bool isEscalation = false, CancellationToken cancellationToken = default)
@@ -151,7 +192,8 @@ public class CandidateAgentService : ICandidateAgentService
         lead.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        var org = await _dbContext.OrganizationProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var org = await _dbContext.OrganizationProfiles.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(o => o.UserId == lead.UserId, cancellationToken);
         var to = org?.EscalationEmail;
         if (!string.IsNullOrWhiteSpace(to))
         {

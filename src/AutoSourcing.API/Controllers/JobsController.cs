@@ -46,7 +46,7 @@ public class JobsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateJob(int id, [FromBody] Job updated, CancellationToken cancellationToken)
     {
-        var job = await _dbContext.Jobs.FindAsync([id], cancellationToken);
+        var job = await _dbContext.Jobs.FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
         if (job is null)
         {
             return NotFound();
@@ -83,7 +83,7 @@ public class JobsController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteJob(int id, CancellationToken cancellationToken)
     {
-        var job = await _dbContext.Jobs.FindAsync([id], cancellationToken);
+        var job = await _dbContext.Jobs.FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
         if (job is null)
         {
             return NotFound();
@@ -97,7 +97,7 @@ public class JobsController : ControllerBase
     [HttpPost("{id:int}/generate-search")]
     public async Task<ActionResult<ProfileSearchRequest>> GenerateSearch(int id, CancellationToken cancellationToken)
     {
-        var job = await _dbContext.Jobs.FindAsync([id], cancellationToken);
+        var job = await _dbContext.Jobs.FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
         if (job is null)
         {
             return NotFound();

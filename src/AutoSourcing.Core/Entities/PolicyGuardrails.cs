@@ -1,8 +1,11 @@
+using AutoSourcing.Core.Abstractions;
+
 namespace AutoSourcing.Core.Entities;
 
-public class PolicyGuardrails
+public class PolicyGuardrails : IOwnedEntity
 {
     public int Id { get; set; }
+    public int UserId { get; set; }
     public string? WhatAiMayAnswer { get; set; }
     public string? EscalationTriggers { get; set; }
     public string? RefusalTopics { get; set; }

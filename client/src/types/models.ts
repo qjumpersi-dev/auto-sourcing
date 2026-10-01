@@ -126,6 +126,17 @@ export interface MicrosoftStatus {
   configured: boolean
 }
 
+export interface AppUser {
+  id: number
+  email: string
+  displayName: string
+  role: string
+  isActive: boolean
+  createdAt: string
+  lastLoginAt: string | null
+  microsoftConnected: boolean
+}
+
 export interface OutreachMessage {
   id: number
   leadId: number

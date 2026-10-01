@@ -29,7 +29,7 @@ public class CandidateAgentController : ControllerBase
     [HttpGet("{leadId:int}")]
     public async Task<ContentResult> ChatPage(int leadId, CancellationToken cancellationToken)
     {
-        var lead = await _dbContext.Leads.FindAsync([leadId], cancellationToken);
+        var lead = await _dbContext.Leads.FirstOrDefaultAsync(l => l.Id == leadId, cancellationToken);
         if (lead is null)
         {
             return Content("<h1>Not found</h1>", "text/html");
@@ -41,7 +41,8 @@ public class CandidateAgentController : ControllerBase
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        var org = await _dbContext.OrganizationProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var org = await _dbContext.OrganizationProfiles.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(o => o.UserId == lead.UserId, cancellationToken);
         var orgName = org?.OrgName ?? "our team";
         var firstName = lead.FirstName;
 
@@ -136,7 +137,7 @@ public class CandidateAgentController : ControllerBase
             return BadRequest(new { error = "Message is required." });
         }
 
-        var lead = await _dbContext.Leads.FindAsync([leadId], cancellationToken);
+        var lead = await _dbContext.Leads.FirstOrDefaultAsync(l => l.Id == leadId, cancellationToken);
         if (lead is null)
         {
             return NotFound();
@@ -168,7 +169,7 @@ public class CandidateAgentController : ControllerBase
     [HttpPost("{leadId:int}/call")]
     public async Task<IActionResult> Call(int leadId, CancellationToken cancellationToken)
     {
-        var lead = await _dbContext.Leads.FindAsync([leadId], cancellationToken);
+        var lead = await _dbContext.Leads.FirstOrDefaultAsync(l => l.Id == leadId, cancellationToken);
         if (lead is null)
         {
             return NotFound();

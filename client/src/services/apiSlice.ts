@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query'
 import { AUTH_TOKEN_KEY } from '@/store/authSlice'
 import type {
+  AppUser,
   AuthResponse,
   AuthStatus,
   AuthUser,
@@ -62,7 +63,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Organization', 'Policy'],
+  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Organization', 'Policy', 'User'],
   endpoints: (builder) => ({
     getAuthStatus: builder.query<AuthStatus, void>({
       query: () => '/auth/status',
@@ -99,6 +100,17 @@ export const apiSlice = createApi({
     }),
     createExtensionCode: builder.mutation<{ code: string; expiresInMinutes: number }, void>({
       query: () => ({ url: '/auth/extension/code', method: 'POST' }),
+    }),
+    getUsers: builder.query<AppUser[], void>({
+      query: () => '/users',
+      providesTags: ['User'],
+    }),
+    createUser: builder.mutation<AppUser, { email: string; displayName: string; password: string; role?: string }>({
+      query: (body) => ({ url: '/users', method: 'POST', body }),
+      invalidatesTags: ['User'],
+    }),
+    changePassword: builder.mutation<{ changed: boolean }, { currentPassword: string; newPassword: string }>({
+      query: (body) => ({ url: '/users/me/password', method: 'POST', body }),
     }),
     getLeads: builder.query<
       PaginatedLeads,
@@ -364,6 +376,9 @@ export const {
   useLazyGetMicrosoftConnectUrlQuery,
   useDisconnectMicrosoftMutation,
   useCreateExtensionCodeMutation,
+  useGetUsersQuery,
+  useCreateUserMutation,
+  useChangePasswordMutation,
   useGetLeadsQuery,
   useSearchRhetorikMutation,
   useGenerateSearchSpecMutation,

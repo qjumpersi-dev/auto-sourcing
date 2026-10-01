@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck, LogOut, UserCog, X } from 'lucide-react'
+import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck, LogOut, UserCog, Users, X } from 'lucide-react'
 import { SearchPage } from '@/features/leads/SearchPage'
 import { LeadsPage } from '@/features/leads/LeadsPage'
 import { CampaignsPage } from '@/features/campaigns/CampaignsPage'
@@ -11,6 +11,7 @@ import { JobsPage } from '@/features/jobs/JobsPage'
 import { JobEditorPage } from '@/features/jobs/JobEditorPage'
 import { OrganizationPage } from '@/features/admin/OrganizationPage'
 import { GuardrailsPage } from '@/features/admin/GuardrailsPage'
+import { UsersPage } from '@/features/admin/UsersPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { AccountModal } from '@/features/auth/AccountModal'
@@ -23,7 +24,7 @@ import type { ProfileSearchRequest } from '@/types/models'
 
 type View =
   | { page: 'search'; initialCriteria?: ProfileSearchRequest }
-  | { page: 'leads' | 'campaigns' | 'sequences' | 'jobs' | 'organization' | 'reports' | 'guardrails' }
+  | { page: 'leads' | 'campaigns' | 'sequences' | 'jobs' | 'organization' | 'reports' | 'guardrails' | 'users' }
   | { page: 'campaign-detail'; campaignId: number }
   | { page: 'sequence-detail'; sequenceId?: number }
   | { page: 'job-detail'; jobId?: number }
@@ -37,6 +38,7 @@ const nav = [
   { key: 'organization', label: 'Organization', icon: Building2 },
   { key: 'guardrails', label: 'Guardrails', icon: ShieldCheck },
   { key: 'reports', label: 'Reports', icon: BarChart3 },
+  { key: 'users', label: 'Users', icon: Users, adminOnly: true },
 ] as const
 
 function App() {
@@ -97,7 +99,9 @@ function App() {
             <p className="mt-2 text-xs text-muted-foreground">AI Sourcing & Recruiting</p>
           </div>
         <nav className="flex flex-col gap-1 p-3">
-          {nav.map(({ key, label, icon: Icon }) => (
+          {nav
+            .filter((item) => !('adminOnly' in item) || user?.role === 'Admin')
+            .map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               type="button"
@@ -205,6 +209,7 @@ function App() {
           {view.page === 'organization' && <OrganizationPage />}
           {view.page === 'guardrails' && <GuardrailsPage />}
           {view.page === 'reports' && <ReportsPage />}
+          {view.page === 'users' && <UsersPage />}
         </div>
       </main>
 

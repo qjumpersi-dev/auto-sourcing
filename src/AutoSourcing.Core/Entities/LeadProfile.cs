@@ -1,8 +1,11 @@
+using AutoSourcing.Core.Abstractions;
+
 namespace AutoSourcing.Core.Entities;
 
-public class LeadProfile
+public class LeadProfile : IOwnedEntity
 {
     public int Id { get; set; }
+    public int UserId { get; set; }
     public int LeadId { get; set; }
     public Lead Lead { get; set; } = null!;
     public string? Headline { get; set; }

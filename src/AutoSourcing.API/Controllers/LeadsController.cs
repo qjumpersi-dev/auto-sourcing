@@ -572,7 +572,7 @@ public class LeadsController : ControllerBase
     [HttpPatch("{id:int}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateLeadStatusRequest request, CancellationToken cancellationToken)
     {
-        var lead = await _dbContext.Leads.FindAsync([id], cancellationToken);
+        var lead = await _dbContext.Leads.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
         if (lead is null)
         {
             return NotFound();
@@ -587,7 +587,7 @@ public class LeadsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<LeadDto>> UpdateLead(int id, [FromBody] UpdateLeadRequest request, CancellationToken cancellationToken)
     {
-        var lead = await _dbContext.Leads.FindAsync([id], cancellationToken);
+        var lead = await _dbContext.Leads.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
         if (lead is null)
         {
             return NotFound();

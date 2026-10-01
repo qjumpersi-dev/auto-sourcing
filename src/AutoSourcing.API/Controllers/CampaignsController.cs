@@ -57,7 +57,7 @@ public class CampaignsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateCampaign(int id, [FromBody] Campaign updated, CancellationToken cancellationToken)
     {
-        var campaign = await _dbContext.Campaigns.FindAsync([id], cancellationToken);
+        var campaign = await _dbContext.Campaigns.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
         if (campaign is null)
         {
             return NotFound();

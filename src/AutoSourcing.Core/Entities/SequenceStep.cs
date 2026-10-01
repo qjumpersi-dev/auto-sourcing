@@ -1,10 +1,12 @@
+using AutoSourcing.Core.Abstractions;
 using AutoSourcing.Core.Enums;
 
 namespace AutoSourcing.Core.Entities;
 
-public class SequenceStep
+public class SequenceStep : IOwnedEntity
 {
     public int Id { get; set; }
+    public int UserId { get; set; }
     public int SequenceId { get; set; }
     public Sequence Sequence { get; set; } = null!;
     public int Order { get; set; }

@@ -1,10 +1,12 @@
+using AutoSourcing.Core.Abstractions;
 using AutoSourcing.Core.Enums;
 
 namespace AutoSourcing.Core.Entities;
 
-public class Job
+public class Job : IOwnedEntity
 {
     public int Id { get; set; }
+    public int UserId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Location { get; set; }
     public string? Industry { get; set; }

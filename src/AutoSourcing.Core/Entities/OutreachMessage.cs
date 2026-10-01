@@ -1,10 +1,12 @@
+using AutoSourcing.Core.Abstractions;
 using AutoSourcing.Core.Enums;
 
 namespace AutoSourcing.Core.Entities;
 
-public class OutreachMessage
+public class OutreachMessage : IOwnedEntity
 {
     public int Id { get; set; }
+    public int UserId { get; set; }
     public int LeadId { get; set; }
     public Lead Lead { get; set; } = null!;
     public int CampaignId { get; set; }

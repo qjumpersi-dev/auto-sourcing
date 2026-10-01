@@ -21,7 +21,7 @@ public class ContentGenerationController : ControllerBase
     [HttpPost("generate-content")]
     public async Task<ActionResult<GeneratedContent>> GenerateContent([FromBody] GenerateContentRequest request, CancellationToken cancellationToken)
     {
-        var job = await _dbContext.Jobs.FindAsync([request.JobId], cancellationToken);
+        var job = await _dbContext.Jobs.FirstOrDefaultAsync(j => j.Id == request.JobId, cancellationToken);
         if (job is null)
         {
             return BadRequest(new { error = $"Job {request.JobId} not found." });

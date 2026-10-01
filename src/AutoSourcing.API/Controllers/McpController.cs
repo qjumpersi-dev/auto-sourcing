@@ -244,10 +244,10 @@ public class McpController : ControllerBase
             }
 
             case "get_company_info":
-                return await _agentService.GetCompanyInfoAsync(cancellationToken);
+                return await _agentService.GetCompanyInfoAsync(GetKey(), cancellationToken);
 
             case "get_guardrails":
-                return await _agentService.GetGuardrailsAsync(cancellationToken);
+                return await _agentService.GetGuardrailsAsync(GetKey(), cancellationToken);
 
             case "escalate_to_recruiter":
             {
