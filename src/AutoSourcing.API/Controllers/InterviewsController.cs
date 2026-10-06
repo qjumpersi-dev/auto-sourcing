@@ -120,6 +120,15 @@ public class InterviewsController : ControllerBase
         }
     }
 
+    // Pull the Teams transcript and generate the AI summary on demand (otherwise this happens
+    // automatically in the background once the interview has finished).
+    [HttpPost("interviews/{id:int}/process-transcript")]
+    public async Task<ActionResult> ProcessTranscript(int id, CancellationToken cancellationToken)
+    {
+        var processed = await _interviewService.ProcessTranscriptAsync(id, cancellationToken);
+        return Ok(new { processed });
+    }
+
     private static object ToDto(Core.Entities.Interview interview) => new
     {
         interview.Id,
@@ -131,6 +140,7 @@ public class InterviewsController : ControllerBase
         interview.DurationMinutes,
         Status = interview.Status.ToString(),
         interview.TeamsJoinUrl,
+        interview.Summary,
         HasTranscript = interview.Transcript != null
     };
 }

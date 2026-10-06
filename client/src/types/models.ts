@@ -147,7 +147,16 @@ export interface Interview {
   durationMinutes: number
   status: string
   teamsJoinUrl: string | null
+  summary: string | null
   hasTranscript: boolean
+}
+
+export interface LeadNote {
+  id: number
+  role: string
+  content: string
+  isEscalation: boolean
+  createdAt: string
 }
 
 export interface InterviewSlot {

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { Award, BookOpen, Briefcase, Building2, CalendarClock, Globe, GraduationCap, Lightbulb, Loader2, Pencil, Sparkles, Target, Trophy, Users, Wrench, X } from 'lucide-react'
-import { useGetLeadConsentQuery, useGetLeadProfileQuery } from '@/services/apiSlice'
+import { Award, BookOpen, Briefcase, Building2, CalendarClock, FileText, Globe, GraduationCap, Lightbulb, Loader2, Pencil, Sparkles, Target, Trophy, Users, Wrench, X } from 'lucide-react'
+import { useGetLeadConsentQuery, useGetLeadNotesQuery, useGetLeadProfileQuery } from '@/services/apiSlice'
 import {
   consentChannelLabels,
   consentStatusLabels,
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { LeadEditModal } from './LeadEditModal'
 import { InterviewPanel } from '@/features/interviews/InterviewPanel'
-import { formatDate } from '@/lib/formatDate'
+import { formatDate, formatDateTime } from '@/lib/formatDate'
 
 interface RhetorikFallback {
   headline?: string | null
@@ -41,6 +41,7 @@ export function LeadProfileModal({
 }) {
   const { data: consent, isLoading: consentLoading } = useGetLeadConsentQuery(lead.id)
   const { data: profile } = useGetLeadProfileQuery(lead.id, { skip: !lead.id })
+  const { data: notes = [] } = useGetLeadNotesQuery(lead.id, { skip: !lead.id })
   const [showEdit, setShowEdit] = useState(false)
 
   const parseList = (value: string | null | undefined): string[] => {
@@ -367,6 +368,31 @@ export function LeadProfileModal({
             {/* Interviews */}
             <Section title="Interviews" icon={<CalendarClock className="h-4 w-4" />}>
               <InterviewPanel leadId={lead.id} campaignId={lead.campaigns?.[0]?.id ?? null} />
+            </Section>
+
+            {/* Notes */}
+            <Section title="Notes & interviews" icon={<FileText className="h-4 w-4" />}>
+              {notes.length > 0 ? (
+                <div className="space-y-3">
+                  {notes.map((note) => (
+                    <div key={note.id} className="rounded-md border p-3 text-sm">
+                      <p className="mb-1 text-xs text-muted-foreground">
+                        {note.role === 'interview-summary' ? 'AI interview summary' : note.role} · {formatDateTime(note.createdAt)}
+                      </p>
+                      {note.role === 'interview-summary' ? (
+                        <div
+                          className="[&_h3]:mb-1 [&_h3]:text-sm [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-2"
+                          dangerouslySetInnerHTML={{ __html: note.content }}
+                        />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{note.content}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty />
+              )}
             </Section>
 
             {/* Campaigns */}

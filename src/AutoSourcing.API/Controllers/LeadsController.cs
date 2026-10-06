@@ -571,6 +571,20 @@ public class LeadsController : ControllerBase
     }
     // Removes contact emails discovered from Rhetorik. Outreach always uses the lead's own email
     // now, so these are no longer used for sending and are safe to clear.
+    // Notes and conversation history stored against the candidate (includes AI interview summaries).
+    [HttpGet("{id:int}/notes")]
+    public async Task<ActionResult> Notes(int id, CancellationToken cancellationToken)
+    {
+        var notes = await _dbContext.ConversationMessages
+            .AsNoTracking()
+            .Where(c => c.LeadId == id)
+            .OrderByDescending(c => c.CreatedAt)
+            .Select(c => new { c.Id, c.Role, c.Content, c.IsEscalation, c.CreatedAt })
+            .ToListAsync(cancellationToken);
+
+        return Ok(notes);
+    }
+
     [HttpDelete("discovered-emails")]
     public async Task<ActionResult> ClearDiscoveredEmails(CancellationToken cancellationToken)
     {

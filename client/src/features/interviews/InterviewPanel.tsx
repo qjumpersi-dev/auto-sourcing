@@ -1,22 +1,29 @@
 import { useState } from 'react'
-import { CalendarPlus, Loader2, Video } from 'lucide-react'
+import { CalendarPlus, FileText, Loader2, Sparkles, Video } from 'lucide-react'
 import {
   useBookInterviewMutation,
   useCancelInterviewMutation,
+  useGetJobsQuery,
   useGetLeadInterviewsQuery,
   useLazyGetInterviewSlotsQuery,
+  useProcessInterviewTranscriptMutation,
 } from '@/services/apiSlice'
 import { formatDateTime } from '@/lib/formatDate'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 
 export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaignId?: number | null }) {
   const { data: interviews = [] } = useGetLeadInterviewsQuery(leadId)
+  const { data: jobs = [] } = useGetJobsQuery()
   const [fetchSlots, { isFetching: loadingSlots }] = useLazyGetInterviewSlotsQuery()
   const [bookInterview, { isLoading: booking }] = useBookInterviewMutation()
   const [cancelInterview] = useCancelInterviewMutation()
+  const [processTranscript, { isLoading: processing }] = useProcessInterviewTranscriptMutation()
 
   const [slots, setSlots] = useState<{ startUtc: string; label: string }[] | null>(null)
+  const [jobId, setJobId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
@@ -40,7 +47,12 @@ export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaig
     setError(null)
     setInfo(null)
     try {
-      await bookInterview({ leadId, startAt: startUtc, campaignId: campaignId ?? null }).unwrap()
+      await bookInterview({
+        leadId,
+        startAt: startUtc,
+        campaignId: campaignId ?? null,
+        jobId: jobId ? Number(jobId) : null,
+      }).unwrap()
       setSlots(null)
       setInfo('Interview booked — the Teams invitation has been sent.')
     } catch (err) {
@@ -59,7 +71,22 @@ export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaig
     }
   }
 
-  const active = interviews.filter((i) => i.status === 'Booked')
+  const onProcess = async (id: number) => {
+    setError(null)
+    setInfo(null)
+    try {
+      const result = await processTranscript(id).unwrap()
+      setInfo(
+        result.processed
+          ? 'Transcript pulled and the AI summary saved to the candidate notes.'
+          : 'No transcript available yet. Make sure the meeting was recorded/transcribed, then try again.',
+      )
+    } catch {
+      setError('Could not process the transcript.')
+    }
+  }
+
+  const active = interviews.filter((i) => i.status === 'Booked' || i.status === 'Completed')
 
   return (
     <div className="space-y-3">
@@ -72,9 +99,10 @@ export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaig
               <p className="text-sm font-medium">{formatDateTime(interview.startAt)}</p>
               <p className="text-xs text-muted-foreground">{interview.durationMinutes} minutes · Teams</p>
             </div>
-            <Badge variant="success">Booked</Badge>
+            <Badge variant={interview.status === 'Completed' ? 'secondary' : 'success'}>{interview.status}</Badge>
           </div>
-          <div className="mt-2 flex items-center gap-2">
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             {interview.teamsJoinUrl && (
               <a
                 href={interview.teamsJoinUrl}
@@ -85,12 +113,37 @@ export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaig
                 <Video className="h-4 w-4" /> Join link
               </a>
             )}
+            <Button size="sm" variant="ghost" onClick={() => onProcess(interview.id)} disabled={processing}>
+              {processing ? <Loader2 className="animate-spin" /> : <FileText className="h-4 w-4" />}
+              Get transcript &amp; summary
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => onCancel(interview.id)}>
               Cancel
             </Button>
           </div>
+
+          {interview.summary && (
+            <div className="mt-3 rounded-md bg-muted/40 p-3 text-sm">
+              <p className="mb-1 flex items-center gap-1 font-medium">
+                <Sparkles className="h-4 w-4 text-blue-600" /> AI interview summary
+              </p>
+              <div className="[&_h3]:mb-1 [&_h3]:text-sm [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-2" dangerouslySetInnerHTML={{ __html: interview.summary }} />
+            </div>
+          )}
         </div>
       ))}
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Role this interview is for (optional)</Label>
+        <Select value={jobId} onChange={(e) => setJobId(e.target.value)}>
+          <option value="">Not linked to a role</option>
+          {jobs.map((job) => (
+            <option key={job.id} value={job.id}>
+              {job.title}
+            </option>
+          ))}
+        </Select>
+      </div>
 
       <div>
         <Button size="sm" variant="outline" onClick={onFindTimes} disabled={loadingSlots || booking}>

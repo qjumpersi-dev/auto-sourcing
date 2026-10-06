@@ -329,6 +329,7 @@ public class AutoSourcingDbContext : DbContext
             entity.Property(i => i.TeamsJoinUrl).HasMaxLength(1000);
             entity.Property(i => i.Notes).HasColumnType("nvarchar(max)");
             entity.Property(i => i.Transcript).HasColumnType("nvarchar(max)");
+            entity.Property(i => i.Summary).HasColumnType("nvarchar(max)");
 
             entity.HasOne(i => i.Lead)
                 .WithMany()

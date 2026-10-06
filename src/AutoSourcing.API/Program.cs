@@ -62,6 +62,7 @@ builder.Services.AddScoped<IMicrosoftTokenService, MicrosoftTokenService>();
 
 builder.Services.Configure<InterviewOptions>(builder.Configuration.GetSection(InterviewOptions.SectionName));
 builder.Services.AddScoped<IInterviewService, InterviewService>();
+builder.Services.AddHttpClient<IInterviewSummaryService, InterviewSummaryService>();
 builder.Services.AddSingleton<IUnsubscribeService, UnsubscribeService>();
 builder.Services.AddSingleton<IEmailTrackingService, EmailTrackingService>();
 builder.Services.AddSingleton<IPersonalizationService, PersonalizationService>();
@@ -80,6 +81,7 @@ builder.Services.AddScoped<ICandidateAgentService, CandidateAgentService>();
 
 builder.Services.AddSingleton<ICampaignRunQueue, CampaignRunQueue>();
 builder.Services.AddHostedService<CampaignRunBackgroundService>();
+builder.Services.AddHostedService<InterviewTranscriptBackgroundService>();
 
 var app = builder.Build();
 

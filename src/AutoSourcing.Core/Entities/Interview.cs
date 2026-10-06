@@ -28,6 +28,10 @@ public class Interview : IOwnedEntity
     public string? Transcript { get; set; }
     public DateTime? TranscriptFetchedAt { get; set; }
 
+    // AI-generated summary of the interview, plus fit against the role and suggested follow-ups.
+    public string? Summary { get; set; }
+    public DateTime? SummaryGeneratedAt { get; set; }
+
     public string? Notes { get; set; }
     public DateTime? ReminderSentAt { get; set; }
 

@@ -19,6 +19,7 @@ import type {
   JobInput,
   Lead,
   LeadConsentResponse,
+  LeadNote,
   LeadProfile,
   LinkedInStatus,
   MicrosoftStatus,
@@ -139,6 +140,14 @@ export const apiSlice = createApi({
     cancelInterview: builder.mutation<{ cancelled: boolean }, { id: number; reason?: string }>({
       query: ({ id, reason }) => ({ url: `/interviews/${id}/cancel`, method: 'POST', body: { reason } }),
       invalidatesTags: ['Interview'],
+    }),
+    processInterviewTranscript: builder.mutation<{ processed: boolean }, number>({
+      query: (id) => ({ url: `/interviews/${id}/process-transcript`, method: 'POST' }),
+      invalidatesTags: ['Interview', 'Lead'],
+    }),
+    getLeadNotes: builder.query<LeadNote[], number>({
+      query: (leadId) => `/leads/${leadId}/notes`,
+      providesTags: ['Lead'],
     }),
     getLeads: builder.query<
       PaginatedLeads,
@@ -413,6 +422,8 @@ export const {
   useBookInterviewMutation,
   useRescheduleInterviewMutation,
   useCancelInterviewMutation,
+  useProcessInterviewTranscriptMutation,
+  useGetLeadNotesQuery,
   useGetLeadsQuery,
   useSearchRhetorikMutation,
   useGenerateSearchSpecMutation,

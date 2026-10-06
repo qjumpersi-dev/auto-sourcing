@@ -28,6 +28,7 @@ public interface IMicrosoftGraphService
     Task<TeamsMeeting> CreateOnlineMeetingAsync(string accessToken, string subject, string body, DateTime startUtc, DateTime endUtc, IEnumerable<MeetingAttendee> attendees, CancellationToken cancellationToken = default);
     Task RescheduleMeetingAsync(string accessToken, string eventId, DateTime startUtc, DateTime endUtc, CancellationToken cancellationToken = default);
     Task CancelMeetingAsync(string accessToken, string eventId, string? comment, CancellationToken cancellationToken = default);
+    Task<string?> GetTranscriptAsync(string accessToken, string joinUrl, CancellationToken cancellationToken = default);
 }
 
 public class MicrosoftGraphService : IMicrosoftGraphService
@@ -297,6 +298,71 @@ public class MicrosoftGraphService : IMicrosoftGraphService
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException($"Microsoft Graph cancel failed ({(int)response.StatusCode}): {body}");
         }
+    }
+
+    public async Task<string?> GetTranscriptAsync(string accessToken, string joinUrl, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(joinUrl))
+        {
+            return null;
+        }
+
+        // Find the online meeting that matches this join link.
+        var filter = Uri.EscapeDataString($"JoinWebUrl eq '{joinUrl.Replace("'", "''")}'");
+        var meetingId = await GetFirstIdAsync(accessToken, $"{GraphBase}/me/onlineMeetings?$filter={filter}", cancellationToken);
+        if (meetingId is null)
+        {
+            return null;
+        }
+
+        var encodedMeeting = Uri.EscapeDataString(meetingId);
+        var transcriptId = await GetFirstIdAsync(accessToken, $"{GraphBase}/me/onlineMeetings/{encodedMeeting}/transcripts", cancellationToken);
+        if (transcriptId is null)
+        {
+            return null;
+        }
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{GraphBase}/me/onlineMeetings/{encodedMeeting}/transcripts/{Uri.EscapeDataString(transcriptId)}/content?$format=text/vtt");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadAsStringAsync(cancellationToken);
+    }
+
+    private async Task<string?> GetFirstIdAsync(string accessToken, string url, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(body);
+        if (!document.RootElement.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
+            {
+                return id.GetString();
+            }
+        }
+
+        return null;
     }
 
     private static Dictionary<string, object?> GraphDateTime(DateTime utc) => new()

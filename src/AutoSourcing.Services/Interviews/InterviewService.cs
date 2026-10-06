@@ -20,6 +20,9 @@ public interface IInterviewService
     Task<Interview> RescheduleAsync(int interviewId, DateTime startUtc, CancellationToken cancellationToken = default);
 
     Task CancelAsync(int interviewId, string? reason, CancellationToken cancellationToken = default);
+
+    // Pull the Teams transcript, summarise it against the role, and save that as a note on the candidate.
+    Task<bool> ProcessTranscriptAsync(int interviewId, CancellationToken cancellationToken = default);
 }
 
 public class InterviewService : IInterviewService
@@ -28,6 +31,7 @@ public class InterviewService : IInterviewService
     private readonly IMicrosoftGraphService _graphService;
     private readonly IMicrosoftTokenService _tokenService;
     private readonly IEmailService _emailService;
+    private readonly IInterviewSummaryService _summaryService;
     private readonly InterviewOptions _options;
 
     public InterviewService(
@@ -35,12 +39,14 @@ public class InterviewService : IInterviewService
         IMicrosoftGraphService graphService,
         IMicrosoftTokenService tokenService,
         IEmailService emailService,
+        IInterviewSummaryService summaryService,
         IOptions<InterviewOptions> options)
     {
         _dbContext = dbContext;
         _graphService = graphService;
         _tokenService = tokenService;
         _emailService = emailService;
+        _summaryService = summaryService;
         _options = options.Value;
     }
 
@@ -275,6 +281,66 @@ public class InterviewService : IInterviewService
         interview.Status = InterviewStatus.Cancelled;
         interview.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> ProcessTranscriptAsync(int interviewId, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Include(i => i.Lead)
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken);
+
+        if (interview?.Lead is null || string.IsNullOrWhiteSpace(interview.TeamsJoinUrl))
+        {
+            return false;
+        }
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == interview.UserId, cancellationToken);
+
+        if (organiser is null || string.IsNullOrWhiteSpace(organiser.MicrosoftRefreshToken))
+        {
+            return false;
+        }
+
+        var accessToken = await _tokenService.GetAccessTokenAsync(organiser, cancellationToken);
+        var transcript = await _graphService.GetTranscriptAsync(accessToken, interview.TeamsJoinUrl, cancellationToken);
+        if (string.IsNullOrWhiteSpace(transcript))
+        {
+            return false;
+        }
+
+        interview.Transcript = transcript;
+        interview.TranscriptFetchedAt = DateTime.UtcNow;
+        interview.Status = InterviewStatus.Completed;
+        interview.UpdatedAt = DateTime.UtcNow;
+
+        var job = interview.JobId is { } jobId
+            ? await _dbContext.Jobs.IgnoreQueryFilters().FirstOrDefaultAsync(j => j.Id == jobId, cancellationToken)
+            : null;
+
+        var candidateName = $"{interview.Lead.FirstName} {interview.Lead.LastName}".Trim();
+        var insights = await _summaryService.AnalyseAsync(transcript, candidateName, job, cancellationToken);
+
+        if (insights is not null)
+        {
+            interview.Summary = insights.Html;
+            interview.SummaryGeneratedAt = DateTime.UtcNow;
+
+            // The summary becomes a note against the candidate.
+            _dbContext.ConversationMessages.Add(new ConversationMessage
+            {
+                UserId = interview.UserId,
+                LeadId = interview.LeadId,
+                Role = "interview-summary",
+                Content = insights.Html,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     // Microsoft never emails the organiser their own meeting, so we send our own confirmation.
