@@ -54,6 +54,8 @@ services:
       - Microsoft__RedirectUri=${MICROSOFT_REDIRECT_URI}
       - Microsoft__AppBaseUrl=${MICROSOFT_APP_BASE_URL}
       - LinkedIn__Mode=${LINKEDIN_MODE}
+      - Interview__TimeZone=${INTERVIEW_TIME_ZONE:-Pacific/Auckland}
+      - Interview__EarliestBookingHours=${INTERVIEW_EARLIEST_BOOKING_HOURS:-48}
     depends_on:
       - sqlserver
 
