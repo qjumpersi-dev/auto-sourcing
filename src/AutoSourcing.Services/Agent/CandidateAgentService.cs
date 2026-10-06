@@ -1,6 +1,8 @@
 using AutoSourcing.Core.Entities;
 using AutoSourcing.Data;
 using AutoSourcing.Services.Email;
+using AutoSourcing.Core.Enums;
+using AutoSourcing.Services.Interviews;
 using Microsoft.EntityFrameworkCore;
 
 namespace AutoSourcing.Services.Agent;
@@ -32,6 +34,10 @@ public interface ICandidateAgentService
     Task<CandidateContext?> GetContextAsync(Guid conversationKey, CancellationToken cancellationToken = default);
     Task<string> GetCompanyInfoAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default);
     Task<string> GetGuardrailsAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default);
+    Task<string> GetInterviewAsync(Guid conversationKey, CancellationToken cancellationToken = default);
+    Task<string> GetInterviewSlotsAsync(Guid conversationKey, CancellationToken cancellationToken = default);
+    Task<string> BookInterviewAsync(Guid conversationKey, int slotNumber, CancellationToken cancellationToken = default);
+    Task<string> RescheduleInterviewAsync(Guid conversationKey, int slotNumber, CancellationToken cancellationToken = default);
     Task SaveMessageAsync(int leadId, string role, string content, bool isEscalation = false, CancellationToken cancellationToken = default);
     Task<bool> EscalateAsync(Guid conversationKey, string reason, CancellationToken cancellationToken = default);
 }
@@ -40,11 +46,13 @@ public class CandidateAgentService : ICandidateAgentService
 {
     private readonly AutoSourcingDbContext _dbContext;
     private readonly IEmailService _emailService;
+    private readonly IInterviewService _interviewService;
 
-    public CandidateAgentService(AutoSourcingDbContext dbContext, IEmailService emailService)
+    public CandidateAgentService(AutoSourcingDbContext dbContext, IEmailService emailService, IInterviewService interviewService)
     {
         _dbContext = dbContext;
         _emailService = emailService;
+        _interviewService = interviewService;
     }
 
     public async Task<Lead?> ResolveLeadAsync(Guid conversationKey, CancellationToken cancellationToken = default)
@@ -156,6 +164,118 @@ public class CandidateAgentService : ICandidateAgentService
 
         return await _dbContext.PolicyGuardrails.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<string> GetInterviewAsync(Guid conversationKey, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Where(i => i.LeadId == lead.Id && i.Status == InterviewStatus.Booked)
+            .OrderByDescending(i => i.StartAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (interview is null)
+        {
+            return "No interview is currently booked.";
+        }
+
+        var join = string.IsNullOrWhiteSpace(interview.TeamsJoinUrl) ? string.Empty : $" Join link: {interview.TeamsJoinUrl}";
+        return $"Interview booked for {interview.StartAt:dddd d MMMM yyyy HH:mm} UTC ({interview.DurationMinutes} minutes).{join}";
+    }
+
+    public async Task<string> GetInterviewSlotsAsync(Guid conversationKey, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        var slots = await _interviewService.GetAvailableSlotsAsync(lead.Id, cancellationToken);
+        if (slots.Count == 0)
+        {
+            return "No interview times are currently available. Tell the candidate a recruiter will be in touch to arrange a time.";
+        }
+
+        var lines = slots.Select((slot, index) => $"{index + 1}. {slot.Label}");
+        return "Available interview times:\n" + string.Join("\n", lines) +
+               "\nOffer these exact options, ask which suits the candidate, then call book_interview with the number they choose.";
+    }
+
+    public async Task<string> BookInterviewAsync(Guid conversationKey, int slotNumber, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        var slots = await _interviewService.GetAvailableSlotsAsync(lead.Id, cancellationToken);
+        if (slotNumber < 1 || slotNumber > slots.Count)
+        {
+            return $"That option is not available. Call get_interview_slots and offer one of the {slots.Count} times.";
+        }
+
+        try
+        {
+            var campaignId = await ResolveCampaignIdAsync(lead.Id, cancellationToken);
+            var interview = await _interviewService.BookAsync(lead.Id, campaignId, null, slots[slotNumber - 1].StartUtc, [], cancellationToken);
+            return $"Interview booked for {interview.StartAt:dddd d MMMM yyyy HH:mm} UTC. A Teams invitation has been emailed to the candidate. Confirm the time with them.";
+        }
+        catch (Exception ex)
+        {
+            return $"Could not book the interview: {ex.Message}";
+        }
+    }
+
+    public async Task<string> RescheduleInterviewAsync(Guid conversationKey, int slotNumber, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        var existing = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Where(i => i.LeadId == lead.Id && i.Status == InterviewStatus.Booked)
+            .OrderByDescending(i => i.StartAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existing is null)
+        {
+            return "There is no booked interview to move. Call get_interview_slots to arrange one.";
+        }
+
+        var slots = await _interviewService.GetAvailableSlotsAsync(lead.Id, cancellationToken);
+        if (slotNumber < 1 || slotNumber > slots.Count)
+        {
+            return $"That option is not available. Offer one of the {slots.Count} times.";
+        }
+
+        try
+        {
+            var interview = await _interviewService.RescheduleAsync(existing.Id, slots[slotNumber - 1].StartUtc, cancellationToken);
+            return $"Interview moved to {interview.StartAt:dddd d MMMM yyyy HH:mm} UTC. The updated Teams invitation has been sent.";
+        }
+        catch (Exception ex)
+        {
+            return $"Could not reschedule the interview: {ex.Message}";
+        }
+    }
+
+    private async Task<int?> ResolveCampaignIdAsync(int leadId, CancellationToken cancellationToken) =>
+        await _dbContext.OutreachMessages
+            .IgnoreQueryFilters()
+            .Where(m => m.LeadId == leadId)
+            .OrderByDescending(m => m.CreatedAt)
+            .Select(m => (int?)m.CampaignId)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task SaveMessageAsync(int leadId, string role, string content, bool isEscalation = false, CancellationToken cancellationToken = default)
     {

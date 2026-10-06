@@ -161,6 +161,34 @@ public class McpController : ControllerBase
                         ["content"] = new JsonObject { ["type"] = "string", ["description"] = "The note to save." }
                     },
                     ["required"] = new JsonArray("content")
+                }),
+            Tool("get_interview",
+                "Get the candidate's currently booked interview, if any.",
+                new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
+            Tool("get_interview_slots",
+                "Get the next available interview times to offer the candidate. Call this when the candidate is interested in moving forward.",
+                new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
+            Tool("book_interview",
+                "Book the interview for the option number the candidate chose. Call get_interview_slots first.",
+                new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["slot"] = new JsonObject { ["type"] = "integer", ["description"] = "The option number the candidate chose (1, 2 or 3)." }
+                    },
+                    ["required"] = new JsonArray("slot")
+                }),
+            Tool("reschedule_interview",
+                "Move an existing booked interview to a new option number. Call get_interview_slots first.",
+                new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["slot"] = new JsonObject { ["type"] = "integer", ["description"] = "The new option number the candidate chose." }
+                    },
+                    ["required"] = new JsonArray("slot")
                 })
         };
 
@@ -269,6 +297,36 @@ public class McpController : ControllerBase
                 if (lead is null) return "Candidate not found.";
                 await _agentService.SaveMessageAsync(lead.Id, "agent-note", content, cancellationToken: cancellationToken);
                 return "Note saved.";
+            }
+
+            case "get_interview":
+            {
+                var key = GetKey();
+                if (key is null) return "Invalid or missing continuity key.";
+                return await _agentService.GetInterviewAsync(key.Value, cancellationToken);
+            }
+
+            case "get_interview_slots":
+            {
+                var key = GetKey();
+                if (key is null) return "Invalid or missing continuity key.";
+                return await _agentService.GetInterviewSlotsAsync(key.Value, cancellationToken);
+            }
+
+            case "book_interview":
+            {
+                var key = GetKey();
+                if (key is null) return "Invalid or missing continuity key.";
+                if (!int.TryParse(GetArg("slot"), out var slot)) return "slot must be a number (1, 2 or 3).";
+                return await _agentService.BookInterviewAsync(key.Value, slot, cancellationToken);
+            }
+
+            case "reschedule_interview":
+            {
+                var key = GetKey();
+                if (key is null) return "Invalid or missing continuity key.";
+                if (!int.TryParse(GetArg("slot"), out var slot)) return "slot must be a number (1, 2 or 3).";
+                return await _agentService.RescheduleInterviewAsync(key.Value, slot, cancellationToken);
             }
 
             default:
