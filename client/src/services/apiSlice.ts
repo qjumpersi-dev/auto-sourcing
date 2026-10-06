@@ -13,6 +13,8 @@ import type {
   EnrichedProfileSearchResponse,
   GeneratedContent,
   GenerateContentRequest,
+  Interview,
+  InterviewSlot,
   Job,
   JobInput,
   Lead,
@@ -63,7 +65,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Organization', 'Policy', 'User'],
+  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Organization', 'Policy', 'User', 'Interview'],
   endpoints: (builder) => ({
     getAuthStatus: builder.query<AuthStatus, void>({
       query: () => '/auth/status',
@@ -111,6 +113,32 @@ export const apiSlice = createApi({
     }),
     changePassword: builder.mutation<{ changed: boolean }, { currentPassword: string; newPassword: string }>({
       query: (body) => ({ url: '/users/me/password', method: 'POST', body }),
+    }),
+    getUpcomingInterviews: builder.query<Interview[], void>({
+      query: () => '/interviews',
+      providesTags: ['Interview'],
+    }),
+    getLeadInterviews: builder.query<Interview[], number>({
+      query: (leadId) => `/leads/${leadId}/interviews`,
+      providesTags: ['Interview'],
+    }),
+    getInterviewSlots: builder.query<InterviewSlot[], number>({
+      query: (leadId) => `/leads/${leadId}/interview-slots`,
+    }),
+    bookInterview: builder.mutation<
+      Interview,
+      { leadId: number; startAt: string; campaignId?: number | null; jobId?: number | null; panelUserIds?: number[] }
+    >({
+      query: ({ leadId, ...body }) => ({ url: `/leads/${leadId}/interviews`, method: 'POST', body }),
+      invalidatesTags: ['Interview'],
+    }),
+    rescheduleInterview: builder.mutation<Interview, { id: number; startAt: string }>({
+      query: ({ id, startAt }) => ({ url: `/interviews/${id}`, method: 'PUT', body: { startAt } }),
+      invalidatesTags: ['Interview'],
+    }),
+    cancelInterview: builder.mutation<{ cancelled: boolean }, { id: number; reason?: string }>({
+      query: ({ id, reason }) => ({ url: `/interviews/${id}/cancel`, method: 'POST', body: { reason } }),
+      invalidatesTags: ['Interview'],
     }),
     getLeads: builder.query<
       PaginatedLeads,
@@ -379,6 +407,12 @@ export const {
   useGetUsersQuery,
   useCreateUserMutation,
   useChangePasswordMutation,
+  useGetUpcomingInterviewsQuery,
+  useGetLeadInterviewsQuery,
+  useLazyGetInterviewSlotsQuery,
+  useBookInterviewMutation,
+  useRescheduleInterviewMutation,
+  useCancelInterviewMutation,
   useGetLeadsQuery,
   useSearchRhetorikMutation,
   useGenerateSearchSpecMutation,

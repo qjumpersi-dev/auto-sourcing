@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Award, BookOpen, Briefcase, Building2, Globe, GraduationCap, Lightbulb, Loader2, Pencil, Sparkles, Target, Trophy, Users, Wrench, X } from 'lucide-react'
+import { Award, BookOpen, Briefcase, Building2, CalendarClock, Globe, GraduationCap, Lightbulb, Loader2, Pencil, Sparkles, Target, Trophy, Users, Wrench, X } from 'lucide-react'
 import { useGetLeadConsentQuery, useGetLeadProfileQuery } from '@/services/apiSlice'
 import {
   consentChannelLabels,
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { LeadEditModal } from './LeadEditModal'
+import { InterviewPanel } from '@/features/interviews/InterviewPanel'
 import { formatDate } from '@/lib/formatDate'
 
 interface RhetorikFallback {
@@ -361,6 +362,11 @@ export function LeadProfileModal({
               ) : (
                 <Empty />
               )}
+            </Section>
+
+            {/* Interviews */}
+            <Section title="Interviews" icon={<CalendarClock className="h-4 w-4" />}>
+              <InterviewPanel leadId={lead.id} campaignId={lead.campaigns?.[0]?.id ?? null} />
             </Section>
 
             {/* Campaigns */}

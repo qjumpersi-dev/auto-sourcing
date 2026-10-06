@@ -137,6 +137,24 @@ export interface AppUser {
   microsoftConnected: boolean
 }
 
+export interface Interview {
+  id: number
+  leadId: number
+  candidateName: string | null
+  campaignId: number | null
+  jobId: number | null
+  startAt: string
+  durationMinutes: number
+  status: string
+  teamsJoinUrl: string | null
+  hasTranscript: boolean
+}
+
+export interface InterviewSlot {
+  startUtc: string
+  label: string
+}
+
 export interface OutreachMessage {
   id: number
   leadId: number

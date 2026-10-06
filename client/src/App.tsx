@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck, LogOut, UserCog, Users, X } from 'lucide-react'
+import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck, LogOut, UserCog, Users, CalendarClock, X } from 'lucide-react'
 import { SearchPage } from '@/features/leads/SearchPage'
 import { LeadsPage } from '@/features/leads/LeadsPage'
 import { CampaignsPage } from '@/features/campaigns/CampaignsPage'
@@ -12,6 +12,7 @@ import { JobEditorPage } from '@/features/jobs/JobEditorPage'
 import { OrganizationPage } from '@/features/admin/OrganizationPage'
 import { GuardrailsPage } from '@/features/admin/GuardrailsPage'
 import { UsersPage } from '@/features/admin/UsersPage'
+import { InterviewsPage } from '@/features/interviews/InterviewsPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { AccountModal } from '@/features/auth/AccountModal'
@@ -24,7 +25,7 @@ import type { ProfileSearchRequest } from '@/types/models'
 
 type View =
   | { page: 'search'; initialCriteria?: ProfileSearchRequest }
-  | { page: 'leads' | 'campaigns' | 'sequences' | 'jobs' | 'organization' | 'reports' | 'guardrails' | 'users' }
+  | { page: 'leads' | 'campaigns' | 'sequences' | 'jobs' | 'organization' | 'reports' | 'guardrails' | 'users' | 'interviews' }
   | { page: 'campaign-detail'; campaignId: number }
   | { page: 'sequence-detail'; sequenceId?: number }
   | { page: 'job-detail'; jobId?: number }
@@ -35,6 +36,7 @@ const nav = [
   { key: 'campaigns', label: 'Campaigns', icon: Megaphone },
   { key: 'sequences', label: 'Sequences', icon: ListOrdered },
   { key: 'jobs', label: 'Jobs', icon: Briefcase },
+  { key: 'interviews', label: 'Interviews', icon: CalendarClock },
   { key: 'organization', label: 'Organization', icon: Building2 },
   { key: 'guardrails', label: 'Guardrails', icon: ShieldCheck },
   { key: 'reports', label: 'Reports', icon: BarChart3 },
@@ -209,6 +211,7 @@ function App() {
           {view.page === 'organization' && <OrganizationPage />}
           {view.page === 'guardrails' && <GuardrailsPage />}
           {view.page === 'reports' && <ReportsPage />}
+          {view.page === 'interviews' && <InterviewsPage />}
           {view.page === 'users' && <UsersPage />}
         </div>
       </main>
