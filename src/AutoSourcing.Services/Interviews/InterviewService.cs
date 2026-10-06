@@ -17,6 +17,9 @@ public interface IInterviewService
 
     Task<Interview> BookAsync(int leadId, int? campaignId, int? jobId, DateTime startUtc, IReadOnlyCollection<int> panelUserIds, CancellationToken cancellationToken = default);
 
+    // Link (or change) the role an interview is for.
+    Task SetRoleAsync(int interviewId, int? jobId, CancellationToken cancellationToken = default);
+
     Task<Interview> RescheduleAsync(int interviewId, DateTime startUtc, CancellationToken cancellationToken = default);
 
     Task CancelAsync(int interviewId, string? reason, CancellationToken cancellationToken = default);
@@ -244,6 +247,24 @@ public class InterviewService : IInterviewService
         await NotifyOrganiserAsync(organiser, lead, interview, "Interview booked", cancellationToken);
 
         return interview;
+    }
+
+    public async Task SetRoleAsync(int interviewId, int? jobId, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken)
+            ?? throw new InvalidOperationException("Interview not found.");
+
+        if (jobId is { } id)
+        {
+            var job = await _dbContext.Jobs
+                .FirstOrDefaultAsync(j => j.Id == id, cancellationToken)
+                ?? throw new InvalidOperationException("Job not found.");
+        }
+
+        interview.JobId = jobId;
+        interview.UpdatedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<Interview> RescheduleAsync(int interviewId, DateTime startUtc, CancellationToken cancellationToken = default)

@@ -24,6 +24,11 @@ public class CancelInterviewRequest
     public string? Reason { get; set; }
 }
 
+public class SetInterviewRoleRequest
+{
+    public int? JobId { get; set; }
+}
+
 [ApiController]
 [Route("api")]
 public class InterviewsController : ControllerBase
@@ -113,6 +118,20 @@ public class InterviewsController : ControllerBase
         {
             await _interviewService.CancelAsync(id, request?.Reason, cancellationToken);
             return Ok(new { cancelled = true });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPut("interviews/{id:int}/role")]
+    public async Task<ActionResult> SetRole(int id, [FromBody] SetInterviewRoleRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _interviewService.SetRoleAsync(id, request?.JobId, cancellationToken);
+            return Ok(new { role = request?.JobId });
         }
         catch (InvalidOperationException ex)
         {

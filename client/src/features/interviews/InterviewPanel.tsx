@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarPlus, FileText, Loader2, Sparkles, Video } from 'lucide-react'
+import { CalendarPlus, Check, FileText, Loader2, Sparkles, Video } from 'lucide-react'
 import {
   useBookInterviewMutation,
   useCancelInterviewMutation,
@@ -7,6 +7,7 @@ import {
   useGetLeadInterviewsQuery,
   useLazyGetInterviewSlotsQuery,
   useProcessInterviewTranscriptMutation,
+  useUpdateInterviewRoleMutation,
 } from '@/services/apiSlice'
 import { formatDateTime } from '@/lib/formatDate'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +27,8 @@ export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaig
   const [jobId, setJobId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [roleSavedFor, setRoleSavedFor] = useState<number | null>(null)
+  const [updateRole, { isLoading: savingRole }] = useUpdateInterviewRoleMutation()
 
   const onFindTimes = async () => {
     setError(null)
@@ -130,11 +133,42 @@ export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaig
               <div className="[&_h3]:mb-1 [&_h3]:text-sm [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-2" dangerouslySetInnerHTML={{ __html: interview.summary }} />
             </div>
           )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Role this interview is for</Label>
+            <Select
+              className="h-8 w-full max-w-xs"
+              value={interview.jobId ?? ''}
+              disabled={savingRole}
+              onChange={async (e) => {
+                const selected = e.target.value
+                const next = selected === '' ? null : Number(selected)
+                try {
+                  await updateRole({ id: interview.id, jobId: next }).unwrap()
+                  setRoleSavedFor(interview.id)
+                } catch {
+                  setError('Could not save the role.')
+                }
+              }}
+            >
+              <option value="">Not linked to a role</option>
+              {jobs.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.title}
+                </option>
+              ))}
+            </Select>
+            {savingRole ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              roleSavedFor === interview.id && <Check className="h-3.5 w-3.5 text-emerald-600" />
+            )}
+          </div>
         </div>
       ))}
 
       <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Role this interview is for (optional)</Label>
+        <Label className="text-xs text-muted-foreground">Role for the new interview (optional)</Label>
         <Select value={jobId} onChange={(e) => setJobId(e.target.value)}>
           <option value="">Not linked to a role</option>
           {jobs.map((job) => (

@@ -145,6 +145,10 @@ export const apiSlice = createApi({
       query: (id) => ({ url: `/interviews/${id}/process-transcript`, method: 'POST' }),
       invalidatesTags: ['Interview', 'Lead'],
     }),
+    updateInterviewRole: builder.mutation<{ role: number | null }, { id: number; jobId: number | null }>({
+      query: ({ id, jobId }) => ({ url: `/interviews/${id}/role`, method: 'PUT', body: { jobId } }),
+      invalidatesTags: ['Interview'],
+    }),
     getLeadNotes: builder.query<LeadNote[], number>({
       query: (leadId) => `/leads/${leadId}/notes`,
       providesTags: ['Lead'],
