@@ -8,6 +8,7 @@ using AutoSourcing.Services.Agent;
 using AutoSourcing.Services.Auth;
 using AutoSourcing.Services.ContentGeneration;
 using AutoSourcing.Services.Email;
+using AutoSourcing.Services.Interviews;
 using AutoSourcing.Services.Jobs;
 using AutoSourcing.Services.LinkedIn;
 using AutoSourcing.Services.Microsoft;
@@ -58,6 +59,9 @@ builder.Services.Configure<MicrosoftOptions>(builder.Configuration.GetSection(Mi
 builder.Services.AddSingleton<ITokenProtector, AesTokenProtector>();
 builder.Services.AddHttpClient<IMicrosoftGraphService, MicrosoftGraphService>();
 builder.Services.AddScoped<IMicrosoftTokenService, MicrosoftTokenService>();
+
+builder.Services.Configure<InterviewOptions>(builder.Configuration.GetSection(InterviewOptions.SectionName));
+builder.Services.AddScoped<IInterviewService, InterviewService>();
 builder.Services.AddSingleton<IUnsubscribeService, UnsubscribeService>();
 builder.Services.AddSingleton<IEmailTrackingService, EmailTrackingService>();
 builder.Services.AddSingleton<IPersonalizationService, PersonalizationService>();
