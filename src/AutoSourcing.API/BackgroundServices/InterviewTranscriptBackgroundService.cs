@@ -68,6 +68,27 @@ public class InterviewTranscriptBackgroundService : BackgroundService
                     var processed = await interviewService.ProcessTranscriptAsync(id, stoppingToken);
                     _logger.LogInformation("Interview {InterviewId} transcript processed: {Processed}", id, processed);
                 }
+
+                // Refine to NoShow / Completed once Teams has attendance data (can take up to a day),
+                // retrying periodically for the first two days.
+                var attendanceWindowStart = now.AddHours(-48);
+                var toCheck = await dbContext.Interviews
+                    .IgnoreQueryFilters()
+                    .Where(i => i.Attended == null
+                                && i.Status != InterviewStatus.Cancelled
+                                && i.StartAt < cutoff
+                                && i.StartAt > attendanceWindowStart
+                                && (i.AttendanceCheckedAt == null || i.AttendanceCheckedAt < now.AddHours(-6)))
+                    .OrderBy(i => i.StartAt)
+                    .Select(i => i.Id)
+                    .Take(20)
+                    .ToListAsync(stoppingToken);
+
+                foreach (var id in toCheck)
+                {
+                    var determined = await interviewService.CheckAttendanceAsync(id, stoppingToken);
+                    _logger.LogInformation("Interview {InterviewId} attendance determined: {Determined}", id, determined);
+                }
             }
             catch (Exception ex)
             {

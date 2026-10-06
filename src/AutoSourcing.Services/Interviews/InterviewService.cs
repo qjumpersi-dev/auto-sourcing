@@ -23,6 +23,9 @@ public interface IInterviewService
 
     // Pull the Teams transcript, summarise it against the role, and save that as a note on the candidate.
     Task<bool> ProcessTranscriptAsync(int interviewId, CancellationToken cancellationToken = default);
+
+    // Check the Teams attendance report and set Completed vs NoShow for the candidate.
+    Task<bool> CheckAttendanceAsync(int interviewId, CancellationToken cancellationToken = default);
 }
 
 public class InterviewService : IInterviewService
@@ -350,6 +353,53 @@ public class InterviewService : IInterviewService
                 CreatedAt = DateTime.UtcNow
             });
         }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> CheckAttendanceAsync(int interviewId, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Include(i => i.Lead)
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken);
+
+        if (interview?.Lead is null || string.IsNullOrWhiteSpace(interview.TeamsJoinUrl))
+        {
+            return false;
+        }
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == interview.UserId, cancellationToken);
+
+        if (organiser is null || string.IsNullOrWhiteSpace(organiser.MicrosoftRefreshToken))
+        {
+            return false;
+        }
+
+        var accessToken = await _tokenService.GetAccessTokenAsync(organiser, cancellationToken);
+        var records = await _graphService.GetAttendanceAsync(accessToken, interview.TeamsJoinUrl, cancellationToken);
+
+        interview.AttendanceCheckedAt = DateTime.UtcNow;
+
+        if (records is null)
+        {
+            // Teams hasn't produced the report yet - try again later.
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return false;
+        }
+
+        var candidateEmail = interview.Lead.Email;
+        var attended = records.Any(record =>
+            !string.IsNullOrWhiteSpace(record.Email) &&
+            string.Equals(record.Email, candidateEmail, StringComparison.OrdinalIgnoreCase) &&
+            record.TotalSeconds > 0);
+
+        interview.Attended = attended;
+        interview.Status = attended ? InterviewStatus.Completed : InterviewStatus.NoShow;
+        interview.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;

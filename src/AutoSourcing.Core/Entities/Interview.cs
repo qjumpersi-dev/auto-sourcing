@@ -35,6 +35,10 @@ public class Interview : IOwnedEntity
     public string? Notes { get; set; }
     public DateTime? ReminderSentAt { get; set; }
 
+    // Attendance from Teams: null until we have checked; then whether the candidate joined.
+    public bool? Attended { get; set; }
+    public DateTime? AttendanceCheckedAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 

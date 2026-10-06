@@ -148,6 +148,7 @@ export interface Interview {
   status: string
   teamsJoinUrl: string | null
   summary: string | null
+  attended: boolean | null
   hasTranscript: boolean
 }
 

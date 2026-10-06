@@ -17,6 +17,8 @@ public record MeetingAttendee(string Email, string? Name);
 
 public record TeamsMeeting(string EventId, string? JoinUrl);
 
+public record AttendanceRecord(string? Email, double TotalSeconds);
+
 public interface IMicrosoftGraphService
 {
     string BuildAuthorizeUrl(string state);
@@ -30,6 +32,7 @@ public interface IMicrosoftGraphService
     Task CancelMeetingAsync(string accessToken, string eventId, string? comment, CancellationToken cancellationToken = default);
     Task<string?> GetTranscriptAsync(string accessToken, string joinUrl, CancellationToken cancellationToken = default);
     Task EnableTranscriptionAsync(string accessToken, string joinUrl, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AttendanceRecord>?> GetAttendanceAsync(string accessToken, string joinUrl, CancellationToken cancellationToken = default);
 }
 
 public class MicrosoftGraphService : IMicrosoftGraphService
@@ -369,6 +372,61 @@ public class MicrosoftGraphService : IMicrosoftGraphService
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException($"Microsoft Graph enable transcription failed ({(int)response.StatusCode}): {body}");
         }
+    }
+
+    // Who actually joined the meeting. Returns null while Teams has not produced the report yet.
+    public async Task<IReadOnlyList<AttendanceRecord>?> GetAttendanceAsync(string accessToken, string joinUrl, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(joinUrl))
+        {
+            return null;
+        }
+
+        var filter = Uri.EscapeDataString($"JoinWebUrl eq '{joinUrl.Replace("'", "''")}'");
+        var meetingId = await GetFirstIdAsync(accessToken, $"{GraphBase}/me/onlineMeetings?$filter={filter}", cancellationToken);
+        if (meetingId is null)
+        {
+            return null;
+        }
+
+        var encoded = Uri.EscapeDataString(meetingId);
+        var reportId = await GetFirstIdAsync(accessToken, $"{GraphBase}/me/onlineMeetings/{encoded}/attendanceReports", cancellationToken);
+        if (reportId is null)
+        {
+            return null; // report not ready yet
+        }
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{GraphBase}/me/onlineMeetings/{encoded}/attendanceReports/{Uri.EscapeDataString(reportId)}/attendanceRecords");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(body);
+
+        var records = new List<AttendanceRecord>();
+        if (document.RootElement.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in value.EnumerateArray())
+            {
+                var email = item.TryGetProperty("emailAddress", out var emailElement) && emailElement.ValueKind == JsonValueKind.String
+                    ? emailElement.GetString()
+                    : null;
+                var seconds = item.TryGetProperty("totalAttendanceInSeconds", out var secondsElement) && secondsElement.TryGetDouble(out var parsed)
+                    ? parsed
+                    : 0;
+
+                records.Add(new AttendanceRecord(email, seconds));
+            }
+        }
+
+        return records;
     }
 
     private async Task<string?> GetFirstIdAsync(string accessToken, string url, CancellationToken cancellationToken)

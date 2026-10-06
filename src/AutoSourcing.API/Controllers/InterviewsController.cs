@@ -141,6 +141,7 @@ public class InterviewsController : ControllerBase
         Status = interview.Status.ToString(),
         interview.TeamsJoinUrl,
         interview.Summary,
+        interview.Attended,
         HasTranscript = interview.Transcript != null
     };
 }

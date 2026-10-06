@@ -49,11 +49,13 @@ export function InterviewsPage() {
                     <TableCell>
                       <Badge
                         variant={
-                          interview.status === 'Completed'
-                            ? 'secondary'
-                            : interview.status === 'Booked'
-                              ? 'success'
-                              : 'outline'
+                          interview.status === 'NoShow'
+                            ? 'destructive'
+                            : interview.status === 'Completed'
+                              ? 'secondary'
+                              : interview.status === 'Booked'
+                                ? 'success'
+                                : 'outline'
                         }
                       >
                         {interview.status}
