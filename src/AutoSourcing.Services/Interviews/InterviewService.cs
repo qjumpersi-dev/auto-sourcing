@@ -1,6 +1,7 @@
 using AutoSourcing.Core.Entities;
 using AutoSourcing.Core.Enums;
 using AutoSourcing.Data;
+using AutoSourcing.Services.Email;
 using AutoSourcing.Services.Microsoft;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -26,17 +27,20 @@ public class InterviewService : IInterviewService
     private readonly AutoSourcingDbContext _dbContext;
     private readonly IMicrosoftGraphService _graphService;
     private readonly IMicrosoftTokenService _tokenService;
+    private readonly IEmailService _emailService;
     private readonly InterviewOptions _options;
 
     public InterviewService(
         AutoSourcingDbContext dbContext,
         IMicrosoftGraphService graphService,
         IMicrosoftTokenService tokenService,
+        IEmailService emailService,
         IOptions<InterviewOptions> options)
     {
         _dbContext = dbContext;
         _graphService = graphService;
         _tokenService = tokenService;
+        _emailService = emailService;
         _options = options.Value;
     }
 
@@ -213,6 +217,8 @@ public class InterviewService : IInterviewService
         _dbContext.Interviews.Add(interview);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        await NotifyOrganiserAsync(organiser, lead, interview, "Interview booked", cancellationToken);
+
         return interview;
     }
 
@@ -240,6 +246,12 @@ public class InterviewService : IInterviewService
         interview.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        var lead = await _dbContext.Leads.IgnoreQueryFilters().FirstOrDefaultAsync(l => l.Id == interview.LeadId, cancellationToken);
+        if (lead is not null)
+        {
+            await NotifyOrganiserAsync(organiser, lead, interview, "Interview rescheduled", cancellationToken);
+        }
+
         return interview;
     }
 
@@ -263,6 +275,43 @@ public class InterviewService : IInterviewService
         interview.Status = InterviewStatus.Cancelled;
         interview.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    // Microsoft never emails the organiser their own meeting, so we send our own confirmation.
+    private async Task NotifyOrganiserAsync(User organiser, Lead lead, Interview interview, string subject, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var local = TimeZoneInfo.ConvertTimeFromUtc(interview.StartAt, ResolveTimeZone());
+            var name = $"{lead.FirstName} {lead.LastName}".Trim();
+
+            var body =
+                $"<p><strong>{subject}</strong></p>" +
+                $"<p><strong>Candidate:</strong> {System.Net.WebUtility.HtmlEncode(name)}</p>" +
+                $"<p><strong>When:</strong> {local:dddd d MMMM yyyy, h:mm tt} ({interview.DurationMinutes} minutes)</p>" +
+                (string.IsNullOrWhiteSpace(interview.TeamsJoinUrl)
+                    ? string.Empty
+                    : $"<p><strong>Teams:</strong> <a href=\"{interview.TeamsJoinUrl}\">Join the interview</a></p>") +
+                "<p>This meeting is in your Microsoft calendar.</p>";
+
+            var sender = new SenderIdentity(
+                organiser.Id,
+                organiser.SendFromAddress,
+                string.IsNullOrWhiteSpace(organiser.SendFromName) ? organiser.DisplayName : organiser.SendFromName,
+                string.IsNullOrWhiteSpace(organiser.ReplyToAddress) ? organiser.Email : organiser.ReplyToAddress);
+
+            await _emailService.SendAsync(
+                new[] { organiser.Email },
+                $"{subject}: {name}",
+                body,
+                headers: null,
+                cancellationToken: cancellationToken,
+                sender: sender);
+        }
+        catch
+        {
+            // A notification failure must not fail the booking itself.
+        }
     }
 
     private IEnumerable<DateTime> BuildCandidateSlots(DateTime windowStart, DateTime windowEnd, TimeZoneInfo timeZone)
