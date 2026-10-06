@@ -1,6 +1,5 @@
 using System.Net.Http.Headers;
 using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -19,7 +18,7 @@ public class TwilioSmsService : ISmsService
         _logger = logger;
     }
 
-    public async Task<SmsSendResult> SendAsync(string to, string message, CancellationToken cancellationToken = default)
+    public async Task<SmsSendResult> SendAsync(string to, string message, int? messageId = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_options.TwilioAccountSid) || string.IsNullOrWhiteSpace(_options.TwilioAuthToken))
         {
@@ -33,32 +32,17 @@ public class TwilioSmsService : ISmsService
 
         try
         {
-            await SendViaTwilioAsync(to, message, "sms", cancellationToken);
+            await SendViaTwilioAsync(to, message, messageId, cancellationToken);
             return new SmsSendResult(true, "SMS", null);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "SMS send failed for {To}, attempting RCS fallback.", to);
-
-            if (_options.UseRcsFallback)
-            {
-                try
-                {
-                    await SendViaTwilioAsync(to, message, "rcs", cancellationToken);
-                    return new SmsSendResult(true, "RCS", null);
-                }
-                catch (Exception rcsEx)
-                {
-                    _logger.LogError(rcsEx, "RCS fallback also failed for {To}.", to);
-                    return new SmsSendResult(false, "None", rcsEx.Message);
-                }
-            }
-
+            _logger.LogWarning(ex, "SMS send failed for {To}", to);
             return new SmsSendResult(false, "None", ex.Message);
         }
     }
 
-    private async Task SendViaTwilioAsync(string to, string message, string channelType, CancellationToken cancellationToken)
+    private async Task SendViaTwilioAsync(string to, string message, int? messageId, CancellationToken cancellationToken)
     {
         var accountSid = _options.TwilioAccountSid!;
         var authToken = _options.TwilioAuthToken!;
@@ -71,9 +55,11 @@ public class TwilioSmsService : ISmsService
             ["Body"] = message
         };
 
-        if (channelType == "rcs")
+        // Ask Twilio to report delivery status back to us so the campaign shows Delivered/Failed.
+        var baseUrl = (_options.PublicBaseUrl ?? string.Empty).TrimEnd('/');
+        if (messageId is { } id && !string.IsNullOrWhiteSpace(baseUrl))
         {
-            form["Media"] = ""; // RCS may need different parameters
+            form["StatusCallback"] = $"{baseUrl}/api/sms/status/{id}";
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
@@ -86,7 +72,7 @@ public class TwilioSmsService : ISmsService
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"Twilio {channelType} send failed ({(int)response.StatusCode}): {errorBody}");
+            throw new InvalidOperationException($"Twilio SMS send failed ({(int)response.StatusCode}): {errorBody}");
         }
     }
 }

@@ -213,7 +213,7 @@ public class OutreachService : IOutreachService
                 }
 
                 var smsText = HtmlToPlainText.Convert(message.Body);
-                var smsResult = await _smsService.SendAsync(phone, smsText, cancellationToken);
+                var smsResult = await _smsService.SendAsync(phone, smsText, message.Id, cancellationToken);
                 if (!smsResult.Sent)
                 {
                     throw new InvalidOperationException($"SMS/RCS send failed: {smsResult.Error}");

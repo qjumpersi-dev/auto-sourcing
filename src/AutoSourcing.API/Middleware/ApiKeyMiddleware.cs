@@ -16,6 +16,7 @@ public class ApiKeyMiddleware
         "/api/auth/extension/exchange",
         "/api/consent",
         "/api/unsubscribe",
+        "/api/sms",
         "/api/tracking",
         "/api/agent",
         "/swagger"
