@@ -37,14 +37,14 @@ public class InterviewsController : ControllerBase
         _interviewService = interviewService;
     }
 
-    // Upcoming interviews for the signed-in user.
+    // Upcoming and recent interviews for the signed-in user.
     [HttpGet("interviews")]
     public async Task<ActionResult> Upcoming(CancellationToken cancellationToken)
     {
         var interviews = await _dbContext.Interviews
             .Include(i => i.Lead)
             .AsNoTracking()
-            .Where(i => i.Status == InterviewStatus.Booked && i.StartAt >= DateTime.UtcNow.AddDays(-1))
+            .Where(i => i.StartAt >= DateTime.UtcNow.AddDays(-30) && i.Status != InterviewStatus.Cancelled)
             .OrderBy(i => i.StartAt)
             .ToListAsync(cancellationToken);
 

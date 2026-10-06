@@ -12,12 +12,14 @@ export function InterviewsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold">Interviews</h2>
-        <p className="text-sm text-muted-foreground">Upcoming Teams interviews you have booked with candidates.</p>
+        <p className="text-sm text-muted-foreground">
+          Teams interviews with candidates. Past interviews are marked completed automatically.
+        </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Upcoming ({interviews.length})</CardTitle>
+          <CardTitle>Upcoming and recent ({interviews.length})</CardTitle>
           <CardDescription>Each interview has a Teams join link and is on your calendar.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -45,7 +47,17 @@ export function InterviewsPage() {
                     <TableCell>{interview.candidateName ?? `#${interview.leadId}`}</TableCell>
                     <TableCell>{interview.durationMinutes} min</TableCell>
                     <TableCell>
-                      <Badge variant="success">{interview.status}</Badge>
+                      <Badge
+                        variant={
+                          interview.status === 'Completed'
+                            ? 'secondary'
+                            : interview.status === 'Booked'
+                              ? 'success'
+                              : 'outline'
+                        }
+                      >
+                        {interview.status}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {interview.teamsJoinUrl ? (

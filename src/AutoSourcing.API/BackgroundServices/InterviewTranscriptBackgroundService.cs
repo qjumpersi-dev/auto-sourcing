@@ -32,12 +32,32 @@ public class InterviewTranscriptBackgroundService : BackgroundService
                 var dbContext = scope.ServiceProvider.GetRequiredService<AutoSourcingDbContext>();
                 var interviewService = scope.ServiceProvider.GetRequiredService<IInterviewService>();
 
-                // Give the meeting time to finish before looking for its transcript.
-                var cutoff = DateTime.UtcNow.AddMinutes(-45);
+                var now = DateTime.UtcNow;
 
+                // Interviews whose time has passed are done, whether or not anything was recorded.
+                var cutoff = now.AddMinutes(-45);
+
+                var finished = await dbContext.Interviews
+                    .IgnoreQueryFilters()
+                    .Where(i => i.Status == InterviewStatus.Booked && i.StartAt < cutoff)
+                    .ToListAsync(stoppingToken);
+
+                foreach (var interview in finished)
+                {
+                    interview.Status = InterviewStatus.Completed;
+                    interview.UpdatedAt = now;
+                }
+
+                if (finished.Count > 0)
+                {
+                    await dbContext.SaveChangesAsync(stoppingToken);
+                    _logger.LogInformation("Marked {Count} interview(s) as completed.", finished.Count);
+                }
+
+                // Then try to pull any transcripts that have become available.
                 var pending = await dbContext.Interviews
                     .IgnoreQueryFilters()
-                    .Where(i => i.Status == InterviewStatus.Booked && i.Transcript == null && i.StartAt < cutoff)
+                    .Where(i => i.Transcript == null && i.StartAt < cutoff && i.Status != InterviewStatus.Cancelled)
                     .OrderBy(i => i.StartAt)
                     .Select(i => i.Id)
                     .Take(20)
