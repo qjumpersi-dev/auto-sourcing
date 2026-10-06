@@ -89,6 +89,25 @@ public class InterviewTranscriptBackgroundService : BackgroundService
                     var determined = await interviewService.CheckAttendanceAsync(id, stoppingToken);
                     _logger.LogInformation("Interview {InterviewId} attendance determined: {Determined}", id, determined);
                 }
+
+                // Send the day-before reminder to candidates.
+                var reminderWindowEnd = now.AddHours(24);
+                var reminders = await dbContext.Interviews
+                    .IgnoreQueryFilters()
+                    .Where(i => i.Status == InterviewStatus.Booked
+                                && i.ReminderSentAt == null
+                                && i.StartAt > now
+                                && i.StartAt <= reminderWindowEnd)
+                    .OrderBy(i => i.StartAt)
+                    .Select(i => i.Id)
+                    .Take(50)
+                    .ToListAsync(stoppingToken);
+
+                foreach (var id in reminders)
+                {
+                    var sent = await interviewService.SendReminderAsync(id, stoppingToken);
+                    _logger.LogInformation("Interview {InterviewId} reminder sent: {Sent}", id, sent);
+                }
             }
             catch (Exception ex)
             {

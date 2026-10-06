@@ -26,6 +26,9 @@ public interface IInterviewService
 
     // Check the Teams attendance report and set Completed vs NoShow for the candidate.
     Task<bool> CheckAttendanceAsync(int interviewId, CancellationToken cancellationToken = default);
+
+    // Email the candidate a reminder a day before the interview.
+    Task<bool> SendReminderAsync(int interviewId, CancellationToken cancellationToken = default);
 }
 
 public class InterviewService : IInterviewService
@@ -401,6 +404,64 @@ public class InterviewService : IInterviewService
         interview.Status = attended ? InterviewStatus.Completed : InterviewStatus.NoShow;
         interview.UpdatedAt = DateTime.UtcNow;
 
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> SendReminderAsync(int interviewId, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Include(i => i.Lead)
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken);
+
+        if (interview?.Lead is null || interview.ReminderSentAt is not null)
+        {
+            return false;
+        }
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == interview.UserId, cancellationToken);
+
+        if (organiser is null || string.IsNullOrWhiteSpace(interview.Lead.Email))
+        {
+            return false;
+        }
+
+        var local = TimeZoneInfo.ConvertTimeFromUtc(interview.StartAt, ResolveTimeZone());
+        var body =
+            $"<p>Hi {System.Net.WebUtility.HtmlEncode(interview.Lead.FirstName)},</p>" +
+            $"<p>This is a reminder that your interview is on <strong>{local:dddd d MMMM yyyy, h:mm tt}</strong> ({interview.DurationMinutes} minutes).</p>" +
+            (string.IsNullOrWhiteSpace(interview.TeamsJoinUrl)
+                ? string.Empty
+                : $"<p><strong>Join:</strong> <a href=\"{interview.TeamsJoinUrl}\">Join the interview</a></p>") +
+            "<p>If you need to change the time, just reply to this email.</p>";
+
+        try
+        {
+            var sender = new SenderIdentity(
+                organiser.Id,
+                organiser.SendFromAddress,
+                string.IsNullOrWhiteSpace(organiser.SendFromName) ? organiser.DisplayName : organiser.SendFromName,
+                string.IsNullOrWhiteSpace(organiser.ReplyToAddress) ? organiser.Email : organiser.ReplyToAddress);
+
+            await _emailService.SendAsync(
+                new[] { interview.Lead.Email },
+                "Reminder: your interview",
+                body,
+                headers: null,
+                cancellationToken: cancellationToken,
+                sender: sender);
+        }
+        catch
+        {
+            // Never let a failed reminder break anything.
+            return false;
+        }
+
+        interview.ReminderSentAt = DateTime.UtcNow;
+        interview.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
