@@ -20,4 +20,8 @@ public class InterviewOptions
 
     public int WorkingHourStart { get; set; } = 9;
     public int WorkingHourEnd { get; set; } = 17;
+
+    // Record and transcribe interviews automatically so we can summarise them afterwards.
+    // Teams only produces a transcript automatically when the meeting records.
+    public bool EnableTranscription { get; set; } = true;
 }

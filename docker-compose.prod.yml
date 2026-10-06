@@ -56,6 +56,7 @@ services:
       - LinkedIn__Mode=${LINKEDIN_MODE}
       - Interview__TimeZone=${INTERVIEW_TIME_ZONE:-Pacific/Auckland}
       - Interview__EarliestBookingHours=${INTERVIEW_EARLIEST_BOOKING_HOURS:-48}
+      - Interview__EnableTranscription=${INTERVIEW_ENABLE_TRANSCRIPTION:-true}
     depends_on:
       - sqlserver
 

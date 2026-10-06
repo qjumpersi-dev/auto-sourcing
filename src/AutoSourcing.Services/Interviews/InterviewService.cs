@@ -178,6 +178,18 @@ public class InterviewService : IInterviewService
         var accessToken = await _tokenService.GetAccessTokenAsync(organiser, cancellationToken);
         var meeting = await _graphService.CreateOnlineMeetingAsync(accessToken, title, body, startUtc, endUtc, attendees, cancellationToken);
 
+        if (_options.EnableTranscription && !string.IsNullOrWhiteSpace(meeting.JoinUrl))
+        {
+            try
+            {
+                await _graphService.EnableTranscriptionAsync(accessToken, meeting.JoinUrl, cancellationToken);
+            }
+            catch
+            {
+                // The tenant's Teams policy may block recording; never fail the booking because of it.
+            }
+        }
+
         var interview = new Interview
         {
             UserId = organiser.Id,

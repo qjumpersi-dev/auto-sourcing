@@ -29,6 +29,7 @@ public interface IMicrosoftGraphService
     Task RescheduleMeetingAsync(string accessToken, string eventId, DateTime startUtc, DateTime endUtc, CancellationToken cancellationToken = default);
     Task CancelMeetingAsync(string accessToken, string eventId, string? comment, CancellationToken cancellationToken = default);
     Task<string?> GetTranscriptAsync(string accessToken, string joinUrl, CancellationToken cancellationToken = default);
+    Task EnableTranscriptionAsync(string accessToken, string joinUrl, CancellationToken cancellationToken = default);
 }
 
 public class MicrosoftGraphService : IMicrosoftGraphService
@@ -334,6 +335,40 @@ public class MicrosoftGraphService : IMicrosoftGraphService
         }
 
         return await response.Content.ReadAsStringAsync(cancellationToken);
+    }
+
+    // Turns on transcription for the meeting. Teams only produces a transcript automatically when
+    // the meeting records, so this also sets recordAutomatically.
+    public async Task EnableTranscriptionAsync(string accessToken, string joinUrl, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(joinUrl))
+        {
+            return;
+        }
+
+        var filter = Uri.EscapeDataString($"JoinWebUrl eq '{joinUrl.Replace("'", "''")}'");
+        var meetingId = await GetFirstIdAsync(accessToken, $"{GraphBase}/me/onlineMeetings?$filter={filter}", cancellationToken);
+        if (meetingId is null)
+        {
+            return;
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, $"{GraphBase}/me/onlineMeetings/{Uri.EscapeDataString(meetingId)}")
+        {
+            Content = JsonContent.Create(new Dictionary<string, object?>
+            {
+                ["recordAutomatically"] = true,
+                ["allowTranscription"] = true
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Microsoft Graph enable transcription failed ({(int)response.StatusCode}): {body}");
+        }
     }
 
     private async Task<string?> GetFirstIdAsync(string accessToken, string url, CancellationToken cancellationToken)
