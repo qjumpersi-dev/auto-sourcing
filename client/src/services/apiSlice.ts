@@ -427,6 +427,7 @@ export const {
   useRescheduleInterviewMutation,
   useCancelInterviewMutation,
   useProcessInterviewTranscriptMutation,
+  useUpdateInterviewRoleMutation,
   useGetLeadNotesQuery,
   useGetLeadsQuery,
   useSearchRhetorikMutation,
