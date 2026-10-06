@@ -11,6 +11,12 @@ public record MicrosoftAccount(string Email, string? DisplayName);
 
 public record MicrosoftSendMail(string To, string Subject, string HtmlBody, string? ReplyTo, string? FromAddress, string? FromName);
 
+public record BusySlot(DateTime StartUtc, DateTime EndUtc);
+
+public record MeetingAttendee(string Email, string? Name);
+
+public record TeamsMeeting(string EventId, string? JoinUrl);
+
 public interface IMicrosoftGraphService
 {
     string BuildAuthorizeUrl(string state);
@@ -18,6 +24,10 @@ public interface IMicrosoftGraphService
     Task<MicrosoftTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default);
     Task<MicrosoftAccount> GetAccountAsync(string accessToken, CancellationToken cancellationToken = default);
     Task SendMailAsync(string accessToken, MicrosoftSendMail message, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<BusySlot>> GetBusySlotsAsync(string accessToken, string mailbox, DateTime startUtc, DateTime endUtc, CancellationToken cancellationToken = default);
+    Task<TeamsMeeting> CreateOnlineMeetingAsync(string accessToken, string subject, string body, DateTime startUtc, DateTime endUtc, IEnumerable<MeetingAttendee> attendees, CancellationToken cancellationToken = default);
+    Task RescheduleMeetingAsync(string accessToken, string eventId, DateTime startUtc, DateTime endUtc, CancellationToken cancellationToken = default);
+    Task CancelMeetingAsync(string accessToken, string eventId, string? comment, CancellationToken cancellationToken = default);
 }
 
 public class MicrosoftGraphService : IMicrosoftGraphService
@@ -146,6 +156,170 @@ public class MicrosoftGraphService : IMicrosoftGraphService
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException($"Microsoft Graph sendMail failed ({(int)response.StatusCode}): {body}");
         }
+    }
+
+    public async Task<IReadOnlyList<BusySlot>> GetBusySlotsAsync(string accessToken, string mailbox, DateTime startUtc, DateTime endUtc, CancellationToken cancellationToken = default)
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["schedules"] = new[] { mailbox },
+            ["startTime"] = GraphDateTime(startUtc),
+            ["endTime"] = GraphDateTime(endUtc),
+            ["availabilityViewInterval"] = 30
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GraphBase}/me/calendar/getSchedule")
+        {
+            Content = JsonContent.Create(payload)
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"Microsoft Graph getSchedule failed ({(int)response.StatusCode}): {body}");
+        }
+
+        var slots = new List<BusySlot>();
+        using var document = JsonDocument.Parse(body);
+        if (!document.RootElement.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.Array)
+        {
+            return slots;
+        }
+
+        foreach (var schedule in value.EnumerateArray())
+        {
+            if (!schedule.TryGetProperty("scheduleItems", out var items) || items.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            foreach (var item in items.EnumerateArray())
+            {
+                var start = ReadGraphDate(item, "start");
+                var end = ReadGraphDate(item, "end");
+                if (start is not null && end is not null)
+                {
+                    slots.Add(new BusySlot(start.Value, end.Value));
+                }
+            }
+        }
+
+        return slots;
+    }
+
+    public async Task<TeamsMeeting> CreateOnlineMeetingAsync(string accessToken, string subject, string body, DateTime startUtc, DateTime endUtc, IEnumerable<MeetingAttendee> attendees, CancellationToken cancellationToken = default)
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["subject"] = subject,
+            ["body"] = new Dictionary<string, object?> { ["contentType"] = "HTML", ["content"] = body },
+            ["start"] = GraphDateTime(startUtc),
+            ["end"] = GraphDateTime(endUtc),
+            ["isOnlineMeeting"] = true,
+            ["onlineMeetingProvider"] = "teamsForBusiness",
+            ["attendees"] = attendees.Select(a => new Dictionary<string, object?>
+            {
+                ["emailAddress"] = new Dictionary<string, object?> { ["address"] = a.Email, ["name"] = a.Name ?? a.Email },
+                ["type"] = "required"
+            }).ToArray()
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GraphBase}/me/events")
+        {
+            Content = JsonContent.Create(payload)
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"Microsoft Graph create event failed ({(int)response.StatusCode}): {responseBody}");
+        }
+
+        using var document = JsonDocument.Parse(responseBody);
+        var root = document.RootElement;
+
+        var eventId = root.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+        if (string.IsNullOrEmpty(eventId))
+        {
+            throw new InvalidOperationException("Microsoft Graph did not return an event id.");
+        }
+
+        string? joinUrl = null;
+        if (root.TryGetProperty("onlineMeeting", out var online) && online.ValueKind == JsonValueKind.Object &&
+            online.TryGetProperty("joinUrl", out var join))
+        {
+            joinUrl = join.GetString();
+        }
+
+        return new TeamsMeeting(eventId, joinUrl);
+    }
+
+    public async Task RescheduleMeetingAsync(string accessToken, string eventId, DateTime startUtc, DateTime endUtc, CancellationToken cancellationToken = default)
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["start"] = GraphDateTime(startUtc),
+            ["end"] = GraphDateTime(endUtc)
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, $"{GraphBase}/me/events/{Uri.EscapeDataString(eventId)}")
+        {
+            Content = JsonContent.Create(payload)
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Microsoft Graph reschedule failed ({(int)response.StatusCode}): {body}");
+        }
+    }
+
+    public async Task CancelMeetingAsync(string accessToken, string eventId, string? comment, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GraphBase}/me/events/{Uri.EscapeDataString(eventId)}/cancel")
+        {
+            Content = JsonContent.Create(new Dictionary<string, object?>
+            {
+                ["comment"] = string.IsNullOrWhiteSpace(comment) ? "This interview has been cancelled." : comment
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Microsoft Graph cancel failed ({(int)response.StatusCode}): {body}");
+        }
+    }
+
+    private static Dictionary<string, object?> GraphDateTime(DateTime utc) => new()
+    {
+        ["dateTime"] = utc.ToString("yyyy-MM-ddTHH:mm:ss"),
+        ["timeZone"] = "UTC"
+    };
+
+    private static DateTime? ReadGraphDate(JsonElement element, string property)
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind != JsonValueKind.Object ||
+            !value.TryGetProperty("dateTime", out var dateTime) || dateTime.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        return DateTime.TryParse(
+            dateTime.GetString(),
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
+            out var parsed)
+            ? parsed
+            : null;
     }
 
     private static Dictionary<string, object?> Recipient(string address) =>

@@ -21,6 +21,8 @@ public class MicrosoftOptions
         "profile",
         "email",
         "User.Read",
-        "Mail.Send"
+        "Mail.Send",
+        "Calendars.ReadWrite",
+        "OnlineMeetings.ReadWrite"
     ];
 }

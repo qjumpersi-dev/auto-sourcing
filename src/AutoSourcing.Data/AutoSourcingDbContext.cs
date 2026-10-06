@@ -71,6 +71,8 @@ public class AutoSourcingDbContext : DbContext
     public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<Interview> Interviews => Set<Interview>();
+    public DbSet<InterviewAttendee> InterviewAttendees => Set<InterviewAttendee>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -106,12 +108,15 @@ public class AutoSourcingDbContext : DbContext
         modelBuilder.Entity<ChannelConsent>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
         modelBuilder.Entity<ConversationMessage>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
         modelBuilder.Entity<LeadProfile>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<Interview>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<InterviewAttendee>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
 
         foreach (var ownedType in new[]
                  {
                      typeof(Lead), typeof(Campaign), typeof(Sequence), typeof(SequenceStep), typeof(Job),
                      typeof(OrganizationProfile), typeof(PolicyGuardrails), typeof(OutreachMessage),
-                     typeof(LeadEmail), typeof(ChannelConsent), typeof(ConversationMessage), typeof(LeadProfile)
+                     typeof(LeadEmail), typeof(ChannelConsent), typeof(ConversationMessage), typeof(LeadProfile),
+                     typeof(Interview), typeof(InterviewAttendee)
                  })
         {
             var ownedBuilder = modelBuilder.Entity(ownedType);
@@ -315,6 +320,36 @@ public class AutoSourcingDbContext : DbContext
         {
             entity.HasIndex(s => s.TokenHash).IsUnique();
             entity.Property(s => s.TokenHash).HasMaxLength(200).IsRequired();
+        });
+
+        modelBuilder.Entity<Interview>(entity =>
+        {
+            entity.Property(i => i.GraphEventId).HasMaxLength(300);
+            entity.Property(i => i.OnlineMeetingId).HasMaxLength(300);
+            entity.Property(i => i.TeamsJoinUrl).HasMaxLength(1000);
+            entity.Property(i => i.Notes).HasColumnType("nvarchar(max)");
+            entity.Property(i => i.Transcript).HasColumnType("nvarchar(max)");
+
+            entity.HasOne(i => i.Lead)
+                .WithMany()
+                .HasForeignKey(i => i.LeadId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(i => i.Campaign)
+                .WithMany()
+                .HasForeignKey(i => i.CampaignId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasMany(i => i.Attendees)
+                .WithOne(a => a.Interview)
+                .HasForeignKey(a => a.InterviewId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InterviewAttendee>(entity =>
+        {
+            entity.Property(a => a.Email).HasMaxLength(320).IsRequired();
+            entity.Property(a => a.Name).HasMaxLength(200);
         });
     }
 }
