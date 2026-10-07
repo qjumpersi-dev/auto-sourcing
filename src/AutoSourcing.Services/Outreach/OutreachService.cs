@@ -294,8 +294,8 @@ public class OutreachService : IOutreachService
                     var step = steps[order];
                     var stepNumber = order + 1;
 
-                    var alreadySentAtStep = group.Any(m => m.StepOrder == stepNumber && m.Status == OutreachMessageStatus.Sent);
-                    if (alreadySentAtStep)
+                    var handledAtStep = group.Any(m => m.StepOrder == stepNumber && m.Status is OutreachMessageStatus.Sent or OutreachMessageStatus.Queued);
+                    if (handledAtStep)
                     {
                         order++;
                         continue;
