@@ -319,6 +319,7 @@ public class MicrosoftGraphService : IMicrosoftGraphService
         var meetingId = await GetFirstIdAsync(accessToken, $"{GraphBase}/me/onlineMeetings?$filter={filter}", cancellationToken);
         if (meetingId is null)
         {
+            _logger.LogWarning("No Teams online meeting found for join url {JoinUrl}", joinUrl);
             return null;
         }
 
@@ -326,6 +327,7 @@ public class MicrosoftGraphService : IMicrosoftGraphService
         var transcriptId = await GetFirstIdAsync(accessToken, $"{GraphBase}/me/onlineMeetings/{encodedMeeting}/transcripts", cancellationToken);
         if (transcriptId is null)
         {
+            _logger.LogWarning("No transcript produced for online meeting {MeetingId} (join url {JoinUrl})", meetingId, joinUrl);
             return null;
         }
 
@@ -337,9 +339,12 @@ public class MicrosoftGraphService : IMicrosoftGraphService
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning("Transcript download failed for meeting {MeetingId} ({Status}): {Body}", meetingId, (int)response.StatusCode, errorBody);
             return null;
         }
 
+        _logger.LogInformation("Fetched Teams transcript for online meeting {MeetingId}.", meetingId);
         return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
