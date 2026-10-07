@@ -3,6 +3,7 @@ using AutoSourcing.Services.Agent;
 using AutoSourcing.Services.Scotty;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace AutoSourcing.API.Controllers;
 
@@ -18,12 +19,14 @@ public class CandidateAgentController : ControllerBase
     private readonly AutoSourcingDbContext _dbContext;
     private readonly IScottyClient _scottyClient;
     private readonly ICandidateAgentService _agentService;
+    private readonly ScottyOptions _scottyOptions;
 
-    public CandidateAgentController(AutoSourcingDbContext dbContext, IScottyClient scottyClient, ICandidateAgentService agentService)
+    public CandidateAgentController(AutoSourcingDbContext dbContext, IScottyClient scottyClient, ICandidateAgentService agentService, IOptions<ScottyOptions> scottyOptions)
     {
         _dbContext = dbContext;
         _scottyClient = scottyClient;
         _agentService = agentService;
+        _scottyOptions = scottyOptions.Value;
     }
 
     [HttpGet("{leadId:int}")]
@@ -154,7 +157,8 @@ public class CandidateAgentController : ControllerBase
         var result = await _scottyClient.SendTextAsync(new ScottyChatRequest
         {
             UserPrompt = request.Message,
-            ContinuityKey = lead.ConversationKey.Value.ToString()
+            ContinuityKey = lead.ConversationKey.Value.ToString(),
+            ChannelId = _scottyOptions.CandidateRestChannelId
         }, cancellationToken);
 
         var output = result.Output ?? string.Empty;
@@ -184,7 +188,8 @@ public class CandidateAgentController : ControllerBase
         var result = await _scottyClient.GetCallCredentialAsync(new ScottyCallRequest
         {
             SessionParticipantId = Guid.NewGuid().ToString(),
-            ContinuityKey = lead.ConversationKey.Value.ToString()
+            ContinuityKey = lead.ConversationKey.Value.ToString(),
+            ChannelId = _scottyOptions.CandidateWebRtcChannelId
         }, cancellationToken);
 
         return Ok(result);

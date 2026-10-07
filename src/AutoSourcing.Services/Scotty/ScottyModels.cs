@@ -6,6 +6,7 @@ public class ScottyChatRequest
 {
     public string UserPrompt { get; set; } = string.Empty;
     public string ContinuityKey { get; set; } = string.Empty;
+    public string? ChannelId { get; set; }
 }
 
 public class ScottyChatResponse
@@ -53,6 +54,7 @@ public class ScottyCallRequest
 {
     public string SessionParticipantId { get; set; } = string.Empty;
     public string? ContinuityKey { get; set; }
+    public string? ChannelId { get; set; }
 }
 
 public class ScottyCallResponse

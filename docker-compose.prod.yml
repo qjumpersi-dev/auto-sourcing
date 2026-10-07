@@ -48,6 +48,8 @@ services:
       - Scotty__ApiKey=${SCOTTY_API_KEY}
       - Scotty__RestChannelId=${SCOTTY_REST_CHANNEL_ID}
       - Scotty__WebRtcChannelId=${SCOTTY_WEBRTC_CHANNEL_ID}
+      - Scotty__CandidateRestChannelId=${SCOTTY_CANDIDATE_REST_CHANNEL_ID}
+      - Scotty__CandidateWebRtcChannelId=${SCOTTY_CANDIDATE_WEBRTC_CHANNEL_ID}
       - NLSearch__OpenAIApiKey=${OPENAI_API_KEY}
       - Microsoft__ClientId=${MICROSOFT_CLIENT_ID}
       - Microsoft__TenantId=${MICROSOFT_TENANT_ID}
