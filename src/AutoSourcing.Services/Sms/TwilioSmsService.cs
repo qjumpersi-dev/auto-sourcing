@@ -51,9 +51,17 @@ public class TwilioSmsService : ISmsService
         var form = new Dictionary<string, string>
         {
             ["To"] = to,
-            ["From"] = _options.FromNumber ?? string.Empty,
             ["Body"] = message
         };
+
+        if (!string.IsNullOrWhiteSpace(_options.MessagingServiceSid))
+        {
+            form["MessagingServiceSid"] = _options.MessagingServiceSid!;
+        }
+        else
+        {
+            form["From"] = _options.FromNumber ?? string.Empty;
+        }
 
         // Ask Twilio to report delivery status back to us so the campaign shows Delivered/Failed.
         var baseUrl = (_options.PublicBaseUrl ?? string.Empty).TrimEnd('/');
