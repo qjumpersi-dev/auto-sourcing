@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AutoSourcing.Services.Microsoft;
@@ -41,11 +42,13 @@ public class MicrosoftGraphService : IMicrosoftGraphService
 
     private readonly HttpClient _httpClient;
     private readonly MicrosoftOptions _options;
+    private readonly ILogger<MicrosoftGraphService> _logger;
 
-    public MicrosoftGraphService(HttpClient httpClient, IOptions<MicrosoftOptions> options)
+    public MicrosoftGraphService(HttpClient httpClient, IOptions<MicrosoftOptions> options, ILogger<MicrosoftGraphService> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _logger = logger;
     }
 
     public string BuildAuthorizeUrl(string state)
@@ -437,6 +440,8 @@ public class MicrosoftGraphService : IMicrosoftGraphService
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning("Microsoft Graph GET {Url} failed ({Status}): {Body}", url, (int)response.StatusCode, errorBody);
             return null;
         }
 

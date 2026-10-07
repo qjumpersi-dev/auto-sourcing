@@ -23,6 +23,8 @@ public class MicrosoftOptions
         "User.Read",
         "Mail.Send",
         "Calendars.ReadWrite",
-        "OnlineMeetings.ReadWrite"
+        "OnlineMeetings.ReadWrite",
+        "OnlineMeetingTranscript.Read.All",
+        "OnlineMeetingArtifact.Read.All"
     ];
 }
