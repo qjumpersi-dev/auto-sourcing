@@ -137,6 +137,19 @@ export function LeadProfileModal({
               <p className="text-sm text-muted-foreground">
                 {[lead.location, lead.company].filter(Boolean).join(' · ')}
               </p>
+              <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                <span>
+                  Candidate ID: <span className="font-mono text-slate-500">{lead.id}</span>
+                </span>
+                <a
+                  href={`/api/agent/${lead.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Preview candidate chat →
+                </a>
+              </p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
