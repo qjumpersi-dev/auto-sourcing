@@ -368,6 +368,7 @@ public class CandidateAgentService : ICandidateAgentService
 
         _dbContext.ConversationMessages.Add(new ConversationMessage
         {
+            UserId = lead.UserId,
             LeadId = lead.Id,
             Role = "system",
             Content = $"Escalated to recruiter: {reason}",

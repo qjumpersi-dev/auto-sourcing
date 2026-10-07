@@ -79,6 +79,7 @@ public class ConsentOptInController : ControllerBase
                 {
                     _dbContext.ChannelConsents.Add(new ChannelConsent
                     {
+                        UserId = lead.UserId,
                         LeadId = leadId,
                         Channel = channel,
                         Status = ConsentStatus.OptedIn,

@@ -536,6 +536,7 @@ public class OutreachService : IOutreachService
             var emails = eligible
                 .Select((entry, index) => new LeadEmail
                 {
+                    UserId = lead.UserId,
                     Email = entry.Address,
                     Type = entry.Type,
                     IsVerified = entry.IsVerified,
