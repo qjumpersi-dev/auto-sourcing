@@ -133,6 +133,13 @@ public class McpController : ControllerBase
                     ["type"] = "object",
                     ["properties"] = new JsonObject()
                 }),
+            Tool("get_role_details",
+                "Get the role the candidate is being considered for: must-haves, skills, key requirements, hiring manager, location, salary and why to join. Call this when the candidate asks about the job.",
+                new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject()
+                }),
             Tool("get_guardrails",
                 "Get the policy guardrails: what you may answer, escalation triggers, refusal topics, disclaimers, and market rules.",
                 new JsonObject
@@ -273,6 +280,13 @@ public class McpController : ControllerBase
 
             case "get_company_info":
                 return await _agentService.GetCompanyInfoAsync(GetKey(), cancellationToken);
+
+            case "get_role_details":
+            {
+                var key = GetKey();
+                if (key is null) return "Invalid or missing continuity key.";
+                return await _agentService.GetRoleDetailsAsync(key.Value, cancellationToken);
+            }
 
             case "get_guardrails":
                 return await _agentService.GetGuardrailsAsync(GetKey(), cancellationToken);

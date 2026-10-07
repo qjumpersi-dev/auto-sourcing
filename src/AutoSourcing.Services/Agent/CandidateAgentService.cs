@@ -34,6 +34,7 @@ public interface ICandidateAgentService
     Task<CandidateContext?> GetContextAsync(Guid conversationKey, CancellationToken cancellationToken = default);
     Task<string> GetCompanyInfoAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default);
     Task<string> GetGuardrailsAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default);
+    Task<string> GetRoleDetailsAsync(Guid conversationKey, CancellationToken cancellationToken = default);
     Task<string> GetInterviewAsync(Guid conversationKey, CancellationToken cancellationToken = default);
     Task<string> GetInterviewSlotsAsync(Guid conversationKey, CancellationToken cancellationToken = default);
     Task<string> BookInterviewAsync(Guid conversationKey, int slotNumber, CancellationToken cancellationToken = default);
@@ -175,17 +176,73 @@ public class CandidateAgentService : ICandidateAgentService
 
         var interview = await _dbContext.Interviews
             .IgnoreQueryFilters()
-            .Where(i => i.LeadId == lead.Id && i.Status == InterviewStatus.Booked)
+            .Where(i => i.LeadId == lead.Id && i.Status != InterviewStatus.Cancelled)
             .OrderByDescending(i => i.StartAt)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (interview is null)
         {
-            return "No interview is currently booked.";
+            return "No interview is booked for this candidate yet.";
         }
 
         var join = string.IsNullOrWhiteSpace(interview.TeamsJoinUrl) ? string.Empty : $" Join link: {interview.TeamsJoinUrl}";
-        return $"Interview booked for {interview.StartAt:dddd d MMMM yyyy HH:mm} UTC ({interview.DurationMinutes} minutes).{join}";
+        return $"Interview status: {interview.Status}. Time: {interview.StartAt:dddd d MMMM yyyy HH:mm} UTC ({interview.DurationMinutes} minutes).{join}";
+    }
+
+    public async Task<string> GetRoleDetailsAsync(Guid conversationKey, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        // The role the candidate is being considered for comes from their interview's linked job.
+        var jobId = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Where(i => i.LeadId == lead.Id && i.JobId != null && i.Status != InterviewStatus.Cancelled)
+            .OrderByDescending(i => i.StartAt)
+            .Select(i => i.JobId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (jobId is null)
+        {
+            return "No specific role is linked to this candidate yet.";
+        }
+
+        var job = await _dbContext.Jobs
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(j => j.Id == jobId.Value, cancellationToken);
+
+        if (job is null)
+        {
+            return "Role details not found.";
+        }
+
+        var salary = job.SalaryType == SalaryType.NotDisclosed || (job.SalaryFrom is null && job.SalaryTo is null)
+            ? "Not disclosed"
+            : (job.SalaryFrom, job.SalaryTo) switch
+            {
+                ({ } from, null) => $"From {from:N0}",
+                (null, { } to) => $"Up to {to:N0}",
+                ({ } from, { } to) => $"{from:N0} – {to:N0}"
+            };
+
+        return $"""
+            Role: {job.Title}
+            Location: {job.Location ?? "—"}
+            Department: {job.Department ?? "—"}
+            Type: {job.Type} · {job.Flexibility}
+            Salary: {salary}
+            Hiring manager: {job.HiringManager ?? "—"}
+            Must-haves: {StripHtml(job.MustHaves) ?? "—"}
+            Nice-to-haves: {StripHtml(job.NiceToHaves) ?? "—"}
+            Skills: {StripHtml(job.Skills) ?? "—"}
+            Education: {StripHtml(job.Education) ?? "—"}
+            Why join: {StripHtml(job.AttractiveReasons) ?? "—"}
+            About the role: {StripHtml(job.AdvertCopy) ?? "—"}
+            """;
     }
 
     public async Task<string> GetInterviewSlotsAsync(Guid conversationKey, CancellationToken cancellationToken = default)
