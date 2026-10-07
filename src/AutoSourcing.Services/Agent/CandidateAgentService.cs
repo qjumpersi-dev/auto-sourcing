@@ -336,8 +336,17 @@ public class CandidateAgentService : ICandidateAgentService
 
     public async Task SaveMessageAsync(int leadId, string role, string content, bool isEscalation = false, CancellationToken cancellationToken = default)
     {
+        // Candidate conversations arrive without a signed-in user, so inherit the lead's owner.
+        var ownerId = await _dbContext.Leads
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(l => l.Id == leadId)
+            .Select(l => (int?)l.UserId)
+            .FirstOrDefaultAsync(cancellationToken) ?? 0;
+
         _dbContext.ConversationMessages.Add(new ConversationMessage
         {
+            UserId = ownerId,
             LeadId = leadId,
             Role = role,
             Content = content,

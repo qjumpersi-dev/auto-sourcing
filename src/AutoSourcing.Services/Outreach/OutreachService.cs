@@ -621,6 +621,7 @@ public class OutreachService : IOutreachService
 
         return new OutreachMessage
         {
+            UserId = lead.UserId,
             LeadId = lead.Id,
             CampaignId = campaignId,
             Channel = channel,
