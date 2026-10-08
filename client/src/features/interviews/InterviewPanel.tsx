@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CalendarPlus, Check, FileText, Loader2, Sparkles, Video } from 'lucide-react'
 import {
   useBookInterviewMutation,
   useCancelInterviewMutation,
+  useGetCampaignQuery,
   useGetJobsQuery,
   useGetLeadInterviewsQuery,
   useLazyGetInterviewSlotsQuery,
@@ -18,6 +19,7 @@ import { Select } from '@/components/ui/select'
 export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaignId?: number | null }) {
   const { data: interviews = [] } = useGetLeadInterviewsQuery(leadId)
   const { data: jobs = [] } = useGetJobsQuery()
+  const { data: campaign } = useGetCampaignQuery(campaignId ?? 0, { skip: !campaignId })
   const [fetchSlots, { isFetching: loadingSlots }] = useLazyGetInterviewSlotsQuery()
   const [bookInterview, { isLoading: booking }] = useBookInterviewMutation()
   const [cancelInterview] = useCancelInterviewMutation()
@@ -25,6 +27,14 @@ export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaig
 
   const [slots, setSlots] = useState<{ startUtc: string; label: string }[] | null>(null)
   const [jobId, setJobId] = useState('')
+  const [jobInitialised, setJobInitialised] = useState(false)
+
+  useEffect(() => {
+    if (campaign && !jobInitialised) {
+      setJobId(campaign.jobId ? String(campaign.jobId) : '')
+      setJobInitialised(true)
+    }
+  }, [campaign, jobInitialised])
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [roleSavedFor, setRoleSavedFor] = useState<number | null>(null)

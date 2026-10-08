@@ -60,6 +60,7 @@ export interface Campaign {
   status: number
   channel: number
   sequenceId: number | null
+  jobId: number | null
   subjectTemplate?: string | null
   bodyTemplate?: string | null
   isRunning: boolean

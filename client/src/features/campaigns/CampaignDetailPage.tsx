@@ -18,6 +18,7 @@ import {
   useGetCampaignQuery,
   useGetMessagesQuery,
   useGetSequencesQuery,
+  useGetJobsQuery,
   useGetLinkedInStatusQuery,
   useSignInToLinkedInMutation,
   useUpdateCampaignMutation,
@@ -77,6 +78,7 @@ export function CampaignDetailPage({
     refetchOnFocus: true,
   })
   const { data: sequences = [] } = useGetSequencesQuery()
+  const { data: jobs = [] } = useGetJobsQuery()
   const { data: linkedInStatus, refetch: refetchLinkedInStatus } = useGetLinkedInStatusQuery()
   const [signInToLinkedIn, { isLoading: signingIn }] = useSignInToLinkedInMutation()
   const [updateCampaign, { isLoading: savingSequence }] = useUpdateCampaignMutation()
@@ -86,6 +88,7 @@ export function CampaignDetailPage({
   const [restartCampaign, { isLoading: restarting }] = useRestartCampaignMutation()
 
   const [selectedSequenceId, setSelectedSequenceId] = useState('')
+  const [selectedJobId, setSelectedJobId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
   const [runResult, setRunResult] = useState<string | null>(null)
@@ -98,8 +101,9 @@ export function CampaignDetailPage({
 
   useEffect(() => {
     setSelectedSequenceId(campaign?.sequenceId ? String(campaign.sequenceId) : '')
+    setSelectedJobId(campaign?.jobId ? String(campaign.jobId) : '')
     setRunResult(null)
-  }, [campaignId, campaign?.sequenceId])
+  }, [campaignId, campaign?.sequenceId, campaign?.jobId])
 
   useEffect(() => {
     if (campaign?.isRunning) {
@@ -131,8 +135,9 @@ export function CampaignDetailPage({
         status: campaign.status,
         channel: campaign.channel,
         sequenceId: selectedSequenceId ? Number(selectedSequenceId) : null,
+        jobId: selectedJobId ? Number(selectedJobId) : null,
       }).unwrap()
-      setSavedMessage('Sequence saved to this campaign.')
+      setSavedMessage('Saved to this campaign.')
     } catch {
       setError('Could not save the sequence.')
     }
@@ -295,8 +300,8 @@ export function CampaignDetailPage({
         <CardHeader>
           <CardTitle>Sequence</CardTitle>
           <CardDescription>
-            Choose the sequence this campaign sends. Messages and InMails are written in the Sequences
-            area.
+            Choose the sequence this campaign sends, and the role it is for. Messages and InMails are
+            written in the Sequences area.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -321,9 +326,28 @@ export function CampaignDetailPage({
                 ))}
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="campaignJob">Role this campaign is for</Label>
+              <Select
+                id="campaignJob"
+                className="w-80"
+                value={selectedJobId}
+                onChange={(e) => {
+                  setSelectedJobId(e.target.value)
+                  setSavedMessage(null)
+                }}
+              >
+                <option value="">No role linked</option>
+                {jobs.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {job.title}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <Button type="button" variant="outline" disabled={savingSequence} onClick={onSaveSequence}>
               {savingSequence ? <Loader2 className="animate-spin" /> : <Save />}
-              Save sequence
+              Save
             </Button>
             {savedMessage && <span className="pb-2 text-xs text-muted-foreground">{savedMessage}</span>}
           </div>

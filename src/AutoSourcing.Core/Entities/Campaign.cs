@@ -9,6 +9,7 @@ public class Campaign : IOwnedEntity
     public int UserId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public int? JobId { get; set; }
     public string? SubjectTemplate { get; set; }
     public string? BodyTemplate { get; set; }
     public OutreachChannel Channel { get; set; } = OutreachChannel.Email;

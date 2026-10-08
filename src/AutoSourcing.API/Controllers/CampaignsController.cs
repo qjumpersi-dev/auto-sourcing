@@ -47,6 +47,11 @@ public class CampaignsController : ControllerBase
             return BadRequest(new { error = "Sequence not found." });
         }
 
+        if (campaign.JobId is int jobId && !await _dbContext.Jobs.AnyAsync(j => j.Id == jobId, cancellationToken))
+        {
+            return BadRequest(new { error = "Job not found." });
+        }
+
         campaign.Id = 0;
         campaign.CreatedAt = DateTime.UtcNow;
         _dbContext.Campaigns.Add(campaign);
@@ -68,8 +73,14 @@ public class CampaignsController : ControllerBase
             return BadRequest(new { error = "Sequence not found." });
         }
 
+        if (updated.JobId is int jobId && !await _dbContext.Jobs.AnyAsync(j => j.Id == jobId, cancellationToken))
+        {
+            return BadRequest(new { error = "Job not found." });
+        }
+
         campaign.Name = updated.Name;
         campaign.Description = updated.Description;
+        campaign.JobId = updated.JobId;
         campaign.Status = updated.Status;
         campaign.Channel = updated.Channel;
         var sequenceChanged = campaign.SequenceId != updated.SequenceId;

@@ -228,13 +228,13 @@ export const apiSlice = createApi({
       query: (id) => `/campaigns/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Campaign', id }],
     }),
-    createCampaign: builder.mutation<Campaign, { name: string; description?: string; sequenceId?: number | null; channel?: number }>({
+    createCampaign: builder.mutation<Campaign, { name: string; description?: string; sequenceId?: number | null; jobId?: number | null; channel?: number }>({
       query: (body) => ({ url: '/campaigns', method: 'POST', body }),
       invalidatesTags: ['Campaign'],
     }),
     updateCampaign: builder.mutation<
       void,
-      { id: number; name: string; description?: string; sequenceId?: number | null; status: number; channel?: number }
+      { id: number; name: string; description?: string; sequenceId?: number | null; jobId?: number | null; status: number; channel?: number }
     >({
       query: ({ id, ...body }) => ({ url: `/campaigns/${id}`, method: 'PUT', body }),
       invalidatesTags: (_result, _error, arg) => ['Campaign', 'OutreachMessage', { type: 'Campaign', id: arg.id }],

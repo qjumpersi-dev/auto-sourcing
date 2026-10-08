@@ -197,13 +197,33 @@ public class CandidateAgentService : ICandidateAgentService
             return "Candidate not found.";
         }
 
-        // The role the candidate is being considered for comes from their interview's linked job.
+        // The role the candidate is being considered for comes from their interview's linked job,
+        // falling back to the role set on the campaign they are in.
         var jobId = await _dbContext.Interviews
             .IgnoreQueryFilters()
             .Where(i => i.LeadId == lead.Id && i.JobId != null && i.Status != InterviewStatus.Cancelled)
             .OrderByDescending(i => i.StartAt)
             .Select(i => i.JobId)
             .FirstOrDefaultAsync(cancellationToken);
+
+        if (jobId is null)
+        {
+            var campaignId = await _dbContext.OutreachMessages
+                .IgnoreQueryFilters()
+                .Where(m => m.LeadId == lead.Id)
+                .OrderByDescending(m => m.CreatedAt)
+                .Select(m => (int?)m.CampaignId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (campaignId is int cid)
+            {
+                jobId = await _dbContext.Campaigns
+                    .IgnoreQueryFilters()
+                    .Where(c => c.Id == cid)
+                    .Select(c => c.JobId)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+        }
 
         if (jobId is null)
         {
