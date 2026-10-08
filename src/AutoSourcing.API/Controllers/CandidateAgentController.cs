@@ -60,9 +60,11 @@ public class CandidateAgentController : ControllerBase
                 * { box-sizing: border-box; }
                 body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #f3f4f6; color: #111827; }
                 .wrap { max-width: 560px; margin: 0 auto; height: 100vh; display: flex; flex-direction: column; background: #fff; }
-                header { padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb; }
+                header { padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
                 header h1 { font-size: 1rem; margin: 0; }
                 header p { margin: .25rem 0 0; font-size: .8rem; color: #6b7280; }
+                #call { background: #059669; white-space: nowrap; }
+                #call.active { background: #dc2626; }
                 #messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .75rem; }
                 .msg { max-width: 80%; padding: .6rem .8rem; border-radius: .75rem; font-size: .9rem; white-space: pre-wrap; }
                 .agent { background: #f3f4f6; align-self: flex-start; }
@@ -76,8 +78,11 @@ public class CandidateAgentController : ControllerBase
             <body>
               <div class="wrap">
                 <header>
-                  <h1>{{orgName}}</h1>
-                  <p>Hi {{firstName}} — ask me anything about the role or the company.</p>
+                  <div>
+                    <h1>{{orgName}}</h1>
+                    <p>Hi {{firstName}} — ask me anything about the role or the company.</p>
+                  </div>
+                  <button id="call">Talk</button>
                 </header>
                 <div id="messages"></div>
                 <footer>
@@ -85,6 +90,7 @@ public class CandidateAgentController : ControllerBase
                   <button id="send">Send</button>
                 </footer>
               </div>
+              <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.js"></script>
               <script>
                 const leadId = {{leadId}};
                 const messages = document.getElementById('messages');
@@ -124,6 +130,50 @@ public class CandidateAgentController : ControllerBase
                 sendBtn.addEventListener('click', send);
                 input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
                 input.focus();
+
+                const callBtn = document.getElementById('call');
+                let room = null;
+
+                function playTrack(track) {
+                  if (track.kind !== 'audio') return;
+                  const el = new Audio();
+                  el.srcObject = new MediaStream([track.mediaStreamTrack]);
+                  el.autoplay = true;
+                  el.play().catch(function () {});
+                }
+
+                async function startCall() {
+                  callBtn.disabled = true;
+                  callBtn.textContent = 'Connecting...';
+                  try {
+                    const res = await fetch('/api/agent/' + leadId + '/call', { method: 'POST' });
+                    const data = await res.json();
+                    if (!data.url || !data.token) throw new Error('no credentials');
+                    const r = new LivekitClient.Room();
+                    r.on(LivekitClient.RoomEvent.TrackSubscribed, playTrack);
+                    r.on(LivekitClient.RoomEvent.Disconnected, function () {
+                      room = null;
+                      callBtn.textContent = 'Talk';
+                      callBtn.classList.remove('active');
+                      callBtn.disabled = false;
+                    });
+                    await r.connect(data.url, data.token);
+                    await r.localParticipant.setMicrophoneEnabled(true);
+                    room = r;
+                    callBtn.textContent = 'End call';
+                    callBtn.classList.add('active');
+                    callBtn.disabled = false;
+                  } catch (e) {
+                    room = null;
+                    callBtn.textContent = 'Talk';
+                    callBtn.disabled = false;
+                    addMessage('agent', 'Sorry, the voice call could not start.');
+                  }
+                }
+
+                callBtn.addEventListener('click', function () {
+                  if (room) { room.disconnect(); } else { startCall(); }
+                });
               </script>
             </body>
             </html>
