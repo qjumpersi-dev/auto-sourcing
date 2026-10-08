@@ -103,6 +103,14 @@ export function InterviewPanel({ leadId, campaignId }: { leadId: number; campaig
 
   return (
     <div className="space-y-3">
+      {campaign?.jobId && (
+        <p className="text-xs text-muted-foreground">
+          This campaign is for:{' '}
+          <span className="font-medium">
+            {jobs.find((job) => job.id === campaign.jobId)?.title ?? 'a linked role'}
+          </span>
+        </p>
+      )}
       {active.length === 0 && <p className="text-sm text-muted-foreground">No interview booked yet.</p>}
 
       {active.map((interview) => (

@@ -33,10 +33,12 @@ interface RhetorikFallback {
 export function LeadProfileModal({
   lead,
   rhetorikData,
+  campaignId,
   onClose,
 }: {
   lead: Lead
   rhetorikData?: RhetorikFallback
+  campaignId?: number | null
   onClose: () => void
 }) {
   const { data: consent, isLoading: consentLoading } = useGetLeadConsentQuery(lead.id)
@@ -380,7 +382,7 @@ export function LeadProfileModal({
 
             {/* Interviews */}
             <Section title="Interviews" icon={<CalendarClock className="h-4 w-4" />}>
-              <InterviewPanel leadId={lead.id} campaignId={lead.campaigns?.[0]?.id ?? null} />
+              <InterviewPanel leadId={lead.id} campaignId={campaignId ?? lead.campaigns?.[0]?.id ?? null} />
             </Section>
 
             {/* Notes */}

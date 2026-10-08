@@ -521,7 +521,7 @@ export function CampaignDetailPage({
         </CardContent>
       </Card>
       {profileLead && (
-        <LeadProfileModal lead={profileLead} onClose={() => setProfileLead(null)} />
+        <LeadProfileModal lead={profileLead} campaignId={campaignId} onClose={() => setProfileLead(null)} />
       )}
     </div>
   )
