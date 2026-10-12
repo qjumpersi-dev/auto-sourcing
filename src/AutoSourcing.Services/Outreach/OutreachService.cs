@@ -212,7 +212,7 @@ public class OutreachService : IOutreachService
                     throw new InvalidOperationException("Lead has no phone number.");
                 }
 
-                var smsText = HtmlToPlainText.Convert(message.Body);
+                var smsText = Gsm7.ToAscii(HtmlToPlainText.Convert(message.Body));
                 var smsResult = await _smsService.SendAsync(phone, smsText, message.Id, cancellationToken);
                 if (!smsResult.Sent)
                 {

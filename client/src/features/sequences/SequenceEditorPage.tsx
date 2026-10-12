@@ -31,6 +31,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { smsSegments, smsToAscii } from '@/lib/sms'
 import { formatSendDays, formatTimeWindow } from './sequenceUtils'
 
 function stripHtml(html: string): string {
@@ -124,6 +125,7 @@ export function SequenceEditorPage({
   const leads = leadsData?.items ?? []
   const step = draft.steps[selectedStep]
   const isEmail = step?.channel === OutreachChannel.Email
+  const isSms = step?.channel === OutreachChannel.Sms
 
   const attributeGroups: EditorAttributeGroup[] = [
     {
@@ -438,21 +440,23 @@ export function SequenceEditorPage({
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label>{isEmail ? 'Email subject' : 'LinkedIn subject'}</Label>
-                  <Input
-                    value={step.subjectTemplate}
-                    onChange={(e) =>
-                      updateStep(selectedStep, { subjectTemplate: e.target.value })
-                    }
-                    placeholder={isEmail ? 'Quick question, {{FirstName}}' : 'Quick question'}
-                  />
-                  {!isEmail && (
-                    <p className={`text-xs ${step.subjectTemplate.length > 200 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {step.subjectTemplate.length}/200 characters
-                    </p>
-                  )}
-                </div>
+                {!isSms && (
+                  <div className="space-y-1.5">
+                    <Label>{isEmail ? 'Email subject' : 'LinkedIn subject'}</Label>
+                    <Input
+                      value={step.subjectTemplate}
+                      onChange={(e) =>
+                        updateStep(selectedStep, { subjectTemplate: e.target.value })
+                      }
+                      placeholder={isEmail ? 'Quick question, {{FirstName}}' : 'Quick question'}
+                    />
+                    {!isEmail && (
+                      <p className={`text-xs ${step.subjectTemplate.length > 200 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        {step.subjectTemplate.length}/200 characters
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="rounded-md border bg-primary/5 p-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -491,18 +495,48 @@ export function SequenceEditorPage({
 
                 <div className="space-y-1.5">
                   <Label>Message body</Label>
-                  <RichTextEditor
-                    key={selectedStep}
-                    value={step.bodyTemplate}
-                    onChange={(html) => updateStep(selectedStep, { bodyTemplate: html })}
-                    placeholder="Write your outreach message..."
-                    attributes={attributeGroups}
-                  />
-                  {!isEmail && (
+                  {isSms ? (
+                    <Textarea
+                      value={smsToAscii(stripHtml(step.bodyTemplate))}
+                      onChange={(e) =>
+                        updateStep(selectedStep, { bodyTemplate: smsToAscii(e.target.value) })
+                      }
+                      placeholder="Write your SMS message - plain text, one segment up to 160 characters..."
+                      rows={4}
+                    />
+                  ) : (
+                    <RichTextEditor
+                      key={selectedStep}
+                      value={step.bodyTemplate}
+                      onChange={(html) => updateStep(selectedStep, { bodyTemplate: html })}
+                      placeholder="Write your outreach message..."
+                      attributes={attributeGroups}
+                    />
+                  )}
+                  {!isEmail && !isSms && (
                     <p className={`text-xs ${stripHtml(step.bodyTemplate).length > 1300 ? 'text-destructive' : 'text-muted-foreground'}`}>
                       {stripHtml(step.bodyTemplate).length}/1300 characters (LinkedIn InMail limit for non-connections)
                     </p>
                   )}
+                  {isSms &&
+                    (() => {
+                      const { chars, segments } = smsSegments(stripHtml(step.bodyTemplate ?? ''))
+                      return (
+                        <>
+                          <p className={`text-xs ${segments > 1 ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
+                            {chars} characters - {segments} SMS segment{segments === 1 ? '' : 's'}
+                          </p>
+                          {segments > 1 && (
+                            <p className="text-xs text-destructive">
+                              Over one SMS segment - this will be sent and billed as {segments}
+                              separate messages, so each extra segment costs another SMS charge. Keep
+                              it to 160 characters or fewer for a single segment (153 characters for
+                              each segment after the first).
+                            </p>
+                          )}
+                        </>
+                      )
+                    })()}
                   <p className="text-xs text-muted-foreground">
                     Use <span className="font-medium">Insert attribute</span> to add contact details,
                     a job link, or an AI personalisation. Attributes are filled in per lead when the
