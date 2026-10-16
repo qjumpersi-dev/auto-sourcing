@@ -61,6 +61,76 @@ function topoToFeatures<P extends GeoJsonProperties>(json: unknown, objectName: 
   return topojsonFeature(topology, topology.objects[objectName]) as unknown as FeatureCollection<Geometry, P>
 }
 
+type Position = number[]
+
+function shoelace(ring: Position[]): number {
+  let area = 0
+  for (let i = 0; i < ring.length - 1; i++) {
+    area += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1]
+  }
+  return area
+}
+
+function normalizePolygonRings(rings: Position[][]): Position[][] {
+  const out: Position[][] = []
+  rings.forEach((ring, index) => {
+    const area = shoelace(ring)
+    if (Math.abs(area) < 1e-9) {
+      return
+    }
+    const wantClockwise = index === 0
+    const isClockwise = area < 0
+    out.push(isClockwise === wantClockwise ? ring : [...ring].reverse())
+  })
+  return out
+}
+
+function normalizeGeometry(geometry: Geometry): Geometry | null {
+  if (geometry.type === 'Polygon') {
+    const rings = normalizePolygonRings(geometry.coordinates as Position[][])
+    return rings.length > 0 ? { type: 'Polygon', coordinates: rings } : null
+  }
+  if (geometry.type === 'MultiPolygon') {
+    const polygons = (geometry.coordinates as Position[][][])
+      .map(normalizePolygonRings)
+      .filter((rings) => rings.length > 0)
+    return polygons.length > 0 ? { type: 'MultiPolygon', coordinates: polygons } : null
+  }
+  return geometry
+}
+
+function normalizeFeature<P extends GeoJsonProperties>(
+  features: Feature<Geometry, P>[],
+): Feature<Geometry, P>[] {
+  const out: Feature<Geometry, P>[] = []
+  for (const feature of features) {
+    const geometry = normalizeGeometry(feature.geometry)
+    if (geometry) {
+      out.push({ ...feature, geometry })
+    }
+  }
+  return out
+}
+
+export function mainExtentFeature<P extends GeoJsonProperties>(
+  feature: Feature<Geometry, P>,
+): Feature<Geometry, P> {
+  const geometry = feature.geometry
+  if (geometry && geometry.type === 'MultiPolygon' && geometry.coordinates.length > 1) {
+    let best = geometry.coordinates[0]
+    let bestArea = Math.abs(shoelace(best[0]))
+    for (const polygon of geometry.coordinates.slice(1)) {
+      const area = Math.abs(shoelace(polygon[0]))
+      if (area > bestArea) {
+        best = polygon
+        bestArea = area
+      }
+    }
+    return { ...feature, geometry: { type: 'Polygon', coordinates: best } }
+  }
+  return feature
+}
+
 export function normalizeName(value: string): string {
   return value
     .normalize('NFD')
@@ -102,7 +172,7 @@ let worldFeaturesPromise: Promise<WorldFeature[] | null> | null = null
 export function loadWorldFeatures(): Promise<WorldFeature[] | null> {
   worldFeaturesPromise ??= (async () => {
     const json = await fetchJson(geoUrl('countries-110m.json'))
-    return json ? topoToFeatures<{ name: string }>(json, 'countries').features : null
+    return json ? normalizeFeature(topoToFeatures<{ name: string }>(json, 'countries').features) : null
   })()
   return worldFeaturesPromise
 }
@@ -114,7 +184,9 @@ export function loadAdmin1(a3: string): Promise<Admin1Feature[] | null> {
   if (!cached) {
     cached = (async () => {
       const json = await fetchJson(geoUrl(`admin1/${a3}.json`))
-      return json ? (topoToFeatures<RegionProps>(json, 'regions').features as Admin1Feature[]) : null
+      return json
+        ? normalizeFeature(topoToFeatures<RegionProps>(json, 'regions').features as Admin1Feature[])
+        : null
     })()
     admin1Cache.set(a3, cached)
   }

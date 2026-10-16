@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { geoMercator, geoNaturalEarth1, geoPath } from 'd3-geo'
 import type { Feature, Geometry } from 'geojson'
-import { formatCompact, normalizeName } from './geo/geoData'
+import { formatCompact, mainExtentFeature, normalizeName } from './geo/geoData'
 
 export interface MapBubble {
   name: string
@@ -28,7 +28,7 @@ const HIGH = [7, 89, 133]
 
 function fillColor(count: number, max: number): string {
   if (max <= 0 || count <= 0) {
-    return '#f8fafc'
+    return '#f1f5f9'
   }
   const t = Math.sqrt(count / max)
   const mix = (i: number) => Math.round(LOW[i] + (HIGH[i] - LOW[i]) * t)
@@ -51,8 +51,25 @@ export function ChoroplethMap({
   width = 720,
   height = 380,
 }: ChoroplethMapProps) {
+  const fitFeatures = useMemo(() => {
+    const withCounts = features.filter(
+      (feature) => (countsByNorm?.get(normalizeName(feature.properties.name)) ?? 0) > 0,
+    )
+    return withCounts.length > 0 ? withCounts : features
+  }, [features, countsByNorm])
+
   const { path, projectionFn } = useMemo(() => {
-    const collection = { type: 'FeatureCollection' as const, features }
+    const pointFeatures = (bubbles ?? []).map(
+      (bubble): Feature<Geometry, { name: string }> => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [bubble.lon, bubble.lat] },
+        properties: { name: bubble.name },
+      }),
+    )
+    const collection = {
+      type: 'FeatureCollection' as const,
+      features: [...fitFeatures.map(mainExtentFeature), ...pointFeatures],
+    }
     const projectionFn =
       projection === 'world'
         ? geoNaturalEarth1().fitExtent(
@@ -70,7 +87,7 @@ export function ChoroplethMap({
             collection,
           )
     return { path: geoPath(projectionFn), projectionFn }
-  }, [features, projection, width, height])
+  }, [fitFeatures, bubbles, projection, width, height])
 
   const maxCount = useMemo(() => {
     let max = 0
@@ -92,6 +109,15 @@ export function ChoroplethMap({
     return max
   }, [bubbles])
 
+  const labeledBubbles = useMemo(() => {
+    return new Set(
+      [...(bubbles ?? [])]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+        .map((bubble) => bubble.name),
+    )
+  }, [bubbles])
+
   if (features.length === 0) {
     return null
   }
@@ -111,8 +137,8 @@ export function ChoroplethMap({
               key={feature.id ?? `${name}-${index}`}
               d={d}
               fill={fillColor(count, maxCount)}
-              stroke="#94a3b8"
-              strokeWidth={0.5}
+              stroke="#64748b"
+              strokeWidth={0.8}
               className={onRegionClick ? 'cursor-pointer' : undefined}
               onClick={onRegionClick ? () => onRegionClick(name) : undefined}
             >
@@ -170,19 +196,21 @@ export function ChoroplethMap({
                   {bubble.name}: {bubble.count.toLocaleString()} candidate{bubble.count === 1 ? '' : 's'}
                 </title>
               </circle>
-              <text
-                x={point[0] + radius + 3}
-                y={point[1] + 3}
-                fontSize={10}
-                fontWeight={600}
-                fill="#0f172a"
-                style={{ paintOrder: 'stroke' }}
-                stroke="#ffffff"
-                strokeWidth={2.5}
-                pointerEvents="none"
-              >
-                {formatCompact(bubble.count)}
-              </text>
+              {labeledBubbles.has(bubble.name) && (
+                <text
+                  x={point[0] + radius + 3}
+                  y={point[1] + 3}
+                  fontSize={10}
+                  fontWeight={600}
+                  fill="#0f172a"
+                  style={{ paintOrder: 'stroke' }}
+                  stroke="#ffffff"
+                  strokeWidth={2.5}
+                  pointerEvents="none"
+                >
+                  {formatCompact(bubble.count)}
+                </text>
+              )}
             </g>
           )
         })}
