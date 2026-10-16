@@ -44,6 +44,7 @@ builder.Services.AddScoped<ISenderProvider, HttpContextSenderProvider>();
 
 builder.Services.Configure<RhetorikOptions>(builder.Configuration.GetSection(RhetorikOptions.SectionName));
 builder.Services.AddHttpClient<IRhetorikClient, RhetorikClient>();
+builder.Services.AddScoped<ILocationBreakdownService, LocationBreakdownService>();
 
 builder.Services.Configure<ScottyOptions>(builder.Configuration.GetSection(ScottyOptions.SectionName));
 builder.Services.AddHttpClient<IScottyClient, ScottyClient>();

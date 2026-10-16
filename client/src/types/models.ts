@@ -305,6 +305,29 @@ export interface AutocompleteSuggestion {
   count?: number | null
 }
 
+export type LocationBreakdownLevel = 'country' | 'state' | 'city'
+
+export interface LocationCount {
+  name: string
+  count: number
+}
+
+export interface LocationBreakdownRequest {
+  search: ProfileSearchRequest
+  level: LocationBreakdownLevel
+  regions?: string[]
+  sample?: LocationCount[]
+  totalMatched?: number
+  returned?: number
+}
+
+export interface LocationBreakdownResponse {
+  level: LocationBreakdownLevel
+  regions: LocationCount[]
+  unavailable?: string[] | null
+  complete?: boolean | null
+}
+
 export interface ScottyAttachment {
   url: string | null
   media_type?: string | null

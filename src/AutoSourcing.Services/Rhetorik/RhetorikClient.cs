@@ -31,6 +31,12 @@ public class RhetorikClient : IRhetorikClient
         return await SearchAllPagesAsync(request, revealAllData: false, cancellationToken);
     }
 
+    public async Task<int> CountProfilesAsync(ProfileSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await SearchSinglePageAsync(request, 1, 1, revealAllData: false, cancellationToken);
+        return response.Counts?.ProfilesTotalResults ?? 0;
+    }
+
     public async Task<IReadOnlyDictionary<string, RhetorikContactEmailData>> FetchContactEmailsAsync(IReadOnlyCollection<string> profileIds, CancellationToken cancellationToken = default)
     {
         // Contact-email discovery uses Rhetorik's paid "reveal_all_data". Never call it unless enabled.
