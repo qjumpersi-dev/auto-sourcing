@@ -141,13 +141,20 @@ public class LeadsController : ControllerBase
 {
     private readonly AutoSourcingDbContext _dbContext;
     private readonly IRhetorikClient _rhetorikClient;
+    private readonly ILocationBreakdownService _locationBreakdownService;
     private readonly INLSearchService _nlSearchService;
     private readonly IOutreachService _outreachService;
 
-    public LeadsController(AutoSourcingDbContext dbContext, IRhetorikClient rhetorikClient, INLSearchService nlSearchService, IOutreachService outreachService)
+    public LeadsController(
+        AutoSourcingDbContext dbContext,
+        IRhetorikClient rhetorikClient,
+        ILocationBreakdownService locationBreakdownService,
+        INLSearchService nlSearchService,
+        IOutreachService outreachService)
     {
         _dbContext = dbContext;
         _rhetorikClient = rhetorikClient;
+        _locationBreakdownService = locationBreakdownService;
         _nlSearchService = nlSearchService;
         _outreachService = outreachService;
     }
@@ -341,6 +348,29 @@ public class LeadsController : ControllerBase
             Pagination = response.Pagination,
             Results = results
         });
+    }
+
+    [HttpPost("location-breakdown")]
+    public async Task<ActionResult<LocationBreakdownResponse>> LocationBreakdown(
+        [FromBody] LocationBreakdownRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.Search is null)
+        {
+            return BadRequest(new { error = "Search criteria are required." });
+        }
+
+        if (!LocationBreakdownLevels.TryParse(request.Level, out _))
+        {
+            return BadRequest(new { error = "Level must be one of: country, state, city." });
+        }
+
+        if (request.Regions is { Count: > LocationBreakdownLevels.MaxRegions })
+        {
+            return BadRequest(new { error = $"At most {LocationBreakdownLevels.MaxRegions} regions can be broken down at once." });
+        }
+
+        return Ok(await _locationBreakdownService.GetBreakdownAsync(request, cancellationToken));
     }
 
     [HttpPost("generate-search")]

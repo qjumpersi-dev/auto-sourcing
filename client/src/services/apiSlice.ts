@@ -22,6 +22,8 @@ import type {
   LeadNote,
   LeadProfile,
   LinkedInStatus,
+  LocationBreakdownRequest,
+  LocationBreakdownResponse,
   MicrosoftStatus,
   OrganizationProfile,
   OutreachMessage,
@@ -182,6 +184,9 @@ export const apiSlice = createApi({
     }),
     searchRhetorik: builder.mutation<EnrichedProfileSearchResponse, ProfileSearchRequest>({
       query: (request) => ({ url: '/leads/search-rhetorik', method: 'POST', body: request }),
+    }),
+    locationBreakdown: builder.mutation<LocationBreakdownResponse, LocationBreakdownRequest>({
+      query: (body) => ({ url: '/leads/location-breakdown', method: 'POST', body }),
     }),
     generateSearchSpec: builder.mutation<Partial<ProfileSearchRequest>, { text: string }>({
       query: (body) => ({ url: '/leads/generate-search', method: 'POST', body }),
@@ -431,6 +436,7 @@ export const {
   useGetLeadNotesQuery,
   useGetLeadsQuery,
   useSearchRhetorikMutation,
+  useLocationBreakdownMutation,
   useGenerateSearchSpecMutation,
   useLazyAutocompleteQuery,
   useImportFromRhetorikMutation,
