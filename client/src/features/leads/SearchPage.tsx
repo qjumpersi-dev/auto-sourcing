@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { AlertCircle, Download, Loader2, MailPlus, Search, Sparkles } from 'lucide-react'
+import { AlertCircle, Download, Loader2, MailPlus, Map, Search, Sparkles, Users } from 'lucide-react'
 import {
   useGetCampaignsQuery,
   useGenerateSearchSpecMutation,
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { LocationMapPanel } from './LocationMapPanel'
 
 interface SearchFormValues {
   freeText: string
@@ -72,6 +73,7 @@ export function SearchPage() {
   const [targetCampaign, setTargetCampaign] = useState('')
   const [addFeedback, setAddFeedback] = useState<string | null>(null)
   const [jobTitleSuggestions, setJobTitleSuggestions] = useState<string[]>([])
+  const [viewMode, setViewMode] = useState<'map' | 'candidates'>('map')
 
   const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<SearchFormValues>({
     defaultValues: {
@@ -149,10 +151,34 @@ export function SearchPage() {
       const response = await searchRhetorik(request).unwrap()
       setLastRequest(request)
       setResults(response)
+      setViewMode(request.cities?.length ? 'candidates' : 'map')
     } catch {
       setSearchError('The search failed. Rhetorik may be having issues - try again or simplify the filters.')
     }
   })
+
+  const drillCountry = (country: string) => {
+    setValue('country', country)
+    setValue('states', '')
+    setValue('cities', '')
+    onSearch()
+  }
+
+  const drillState = (state: string) => {
+    const current = toList(getValues('states')) ?? []
+    if (!current.some((s) => s.toLowerCase() === state.toLowerCase())) {
+      setValue('states', [...current, state].join(', '))
+    }
+    onSearch()
+  }
+
+  const drillCity = (city: string) => {
+    const current = toList(getValues('cities')) ?? []
+    if (!current.some((c) => c.toLowerCase() === city.toLowerCase())) {
+      setValue('cities', [...current, city].join(', '))
+    }
+    onSearch()
+  }
 
   const toggleResult = (profileId: string) => {
     setSelectedResultIds((prev) => {
@@ -367,7 +393,7 @@ export function SearchPage() {
           </div>
         )}
 
-        {results && (
+        {results && lastRequest && (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-medium">
@@ -376,6 +402,17 @@ export function SearchPage() {
                 500 shown)
               </p>
               <div className="flex flex-wrap items-center gap-2">
+                {viewMode === 'map' ? (
+                  <Button size="sm" variant="outline" onClick={() => setViewMode('candidates')}>
+                    <Users />
+                    Show candidates
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setViewMode('map')}>
+                    <Map />
+                    Show map
+                  </Button>
+                )}
                 <Select
                   className="h-8 w-48 text-xs"
                   value={targetCampaign}
@@ -399,32 +436,42 @@ export function SearchPage() {
               </div>
             </div>
 
-            {addFeedback && (
-              <p className="text-xs text-muted-foreground">{addFeedback}</p>
-            )}
+            {viewMode === 'map' ? (
+              <LocationMapPanel
+                searchRequest={lastRequest}
+                results={results}
+                onDrillCountry={drillCountry}
+                onDrillState={drillState}
+                onDrillCity={drillCity}
+              />
+            ) : (
+              <>
+                {addFeedback && (
+                  <p className="text-xs text-muted-foreground">{addFeedback}</p>
+                )}
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onImportSelected}
-                disabled={importing || selectedResultIds.size === 0}
-              >
-                {importing ? <Loader2 className="animate-spin" /> : <Download />}
-                Save selected ({selectedResultIds.size})
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onImportAll}
-                disabled={importing || results.results.length === 0}
-              >
-                {importing ? <Loader2 className="animate-spin" /> : <Download />}
-                Save all shown
-              </Button>
-            </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onImportSelected}
+                    disabled={importing || selectedResultIds.size === 0}
+                  >
+                    {importing ? <Loader2 className="animate-spin" /> : <Download />}
+                    Save selected ({selectedResultIds.size})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onImportAll}
+                    disabled={importing || results.results.length === 0}
+                  >
+                    {importing ? <Loader2 className="animate-spin" /> : <Download />}
+                    Save all shown
+                  </Button>
+                </div>
 
-            <Table>
+                <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
@@ -485,6 +532,8 @@ export function SearchPage() {
                 })}
               </TableBody>
             </Table>
+              </>
+            )}
           </div>
         )}
       </CardContent>

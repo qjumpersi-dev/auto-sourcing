@@ -26,6 +26,12 @@ public class RhetorikClient : IRhetorikClient
         _httpClient.DefaultRequestHeaders.Add("X-Api-Key", opts.ApiKey);
     }
 
+    public async Task<int> CountProfilesAsync(ProfileSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await SearchSinglePageAsync(request, 1, 1, cancellationToken);
+        return response.Counts?.ProfilesTotalResults ?? 0;
+    }
+
     public async Task<ProfileSearchResponse> SearchProfilesAsync(ProfileSearchRequest request, CancellationToken cancellationToken = default)
     {
         var maxResults = Math.Clamp(request.MaxResults, 1, 1000);
