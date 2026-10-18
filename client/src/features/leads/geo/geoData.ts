@@ -244,17 +244,20 @@ export function findCityCoords(
     (c) => normalizeName(c.n) === target || (c.a ?? []).some((alt) => normalizeName(alt) === target),
   )
   let pool = exact
-  if (exact.length === 0) {
+  if (pool.length === 0) {
     pool = candidates.filter((c) => normalizeName(c.n).startsWith(target) && target.length >= 3)
   }
+
+  if (stateNorms.length > 0) {
+    const stateSet = new Set(stateNorms)
+    pool = pool.filter((c) => c.sn && stateSet.has(normalizeName(c.sn)))
+  }
+
   if (pool.length === 0) {
     return null
   }
 
-  const inState = pool.filter(
-    (c) => stateNorms.length === 0 || !c.sn || stateNorms.includes(normalizeName(c.sn)),
-  )
-  const best = (inState.length > 0 ? inState : pool).reduce((a, b) => (b.p > a.p ? b : a))
+  const best = pool.reduce((a, b) => (b.p > a.p ? b : a))
   return { la: best.la, lo: best.lo }
 }
 
