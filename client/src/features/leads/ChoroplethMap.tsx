@@ -26,6 +26,8 @@ interface ChoroplethMapProps {
 const LOW = [224, 242, 254]
 const HIGH = [7, 89, 133]
 
+const MIN_VISIBLE_COUNT = 1000
+
 function fillColor(count: number, max: number): string {
   if (max <= 0 || count <= 0) {
     return '#f1f5f9'
@@ -51,15 +53,24 @@ export function ChoroplethMap({
   width = 720,
   height = 380,
 }: ChoroplethMapProps) {
+  const visibleBubbles = useMemo(
+    () => (bubbles ?? []).filter((bubble) => bubble.count >= MIN_VISIBLE_COUNT),
+    [bubbles],
+  )
+
   const fitFeatures = useMemo(() => {
-    const withCounts = features.filter(
-      (feature) => (countsByNorm?.get(normalizeName(feature.properties.name)) ?? 0) > 0,
-    )
-    return withCounts.length > 0 ? withCounts : features
+    const countOf = (feature: Feature<Geometry, { name: string }>) =>
+      countsByNorm?.get(normalizeName(feature.properties.name)) ?? 0
+    const strong = features.filter((feature) => countOf(feature) >= MIN_VISIBLE_COUNT)
+    if (strong.length > 0) {
+      return strong
+    }
+    const any = features.filter((feature) => countOf(feature) > 0)
+    return any.length > 0 ? any : features
   }, [features, countsByNorm])
 
   const { path, projectionFn } = useMemo(() => {
-    const pointFeatures = (bubbles ?? []).map(
+    const pointFeatures = visibleBubbles.map(
       (bubble): Feature<Geometry, { name: string }> => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [bubble.lon, bubble.lat] },
@@ -87,7 +98,7 @@ export function ChoroplethMap({
             collection,
           )
     return { path: geoPath(projectionFn), projectionFn }
-  }, [fitFeatures, bubbles, projection, width, height])
+  }, [fitFeatures, visibleBubbles, projection, width, height])
 
   const maxCount = useMemo(() => {
     let max = 0
@@ -101,22 +112,22 @@ export function ChoroplethMap({
 
   const maxBubble = useMemo(() => {
     let max = 0
-    for (const bubble of bubbles ?? []) {
+    for (const bubble of visibleBubbles) {
       if (bubble.count > max) {
         max = bubble.count
       }
     }
     return max
-  }, [bubbles])
+  }, [visibleBubbles])
 
   const labeledBubbles = useMemo(() => {
     return new Set(
-      [...(bubbles ?? [])]
+      [...visibleBubbles]
         .sort((a, b) => b.count - a.count)
         .slice(0, 10)
         .map((bubble) => bubble.name),
     )
-  }, [bubbles])
+  }, [visibleBubbles])
 
   if (features.length === 0) {
     return null
@@ -170,7 +181,7 @@ export function ChoroplethMap({
           )
         })}
 
-        {(bubbles ?? []).map((bubble) => {
+        {visibleBubbles.map((bubble) => {
           const point = projectionFn([bubble.lon, bubble.lat])
           if (!point) {
             return null
@@ -218,7 +229,7 @@ export function ChoroplethMap({
         {features.map((feature, index) => {
           const name = feature.properties.name
           const count = countsByNorm?.get(normalizeName(name)) ?? 0
-          if (count <= 0) {
+          if (count < MIN_VISIBLE_COUNT) {
             return null
           }
           const centroid = path.centroid(feature)
