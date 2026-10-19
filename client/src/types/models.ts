@@ -221,6 +221,7 @@ export interface ProfileSearchRequest {
   states?: string[]
   cities?: string[]
   jobTitleSuggestions?: string[]
+  contactFilter?: string
   pageNumber?: number
   pageSize?: number
   maxResults?: number

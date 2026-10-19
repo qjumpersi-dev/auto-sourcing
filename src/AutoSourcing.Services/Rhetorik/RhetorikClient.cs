@@ -28,7 +28,33 @@ public class RhetorikClient : IRhetorikClient
 
     public async Task<ProfileSearchResponse> SearchProfilesAsync(ProfileSearchRequest request, CancellationToken cancellationToken = default)
     {
-        return await SearchAllPagesAsync(request, revealAllData: false, cancellationToken);
+        var response = await SearchAllPagesAsync(request, revealAllData: false, cancellationToken);
+
+        // "Email or phone" has no server-side Rhetorik tag, so it is applied to the results here.
+        if (request.ContactFilter == ProfileSearchRequest.ContactEmailOrPhone)
+        {
+            response = new ProfileSearchResponse
+            {
+                Counts = response.Counts,
+                Results = response.Results.Where(HasContactableDetail).ToList(),
+                Pagination = response.Pagination,
+                Errors = response.Errors
+            };
+        }
+
+        return response;
+    }
+
+    private static bool HasContactableDetail(RhetorikProfileResult r)
+    {
+        var emails = r.ContactData?.ContactEmails;
+        if (emails is { Count: > 0 } && emails.Any(e => !string.IsNullOrWhiteSpace(e.Email)))
+        {
+            return true;
+        }
+
+        var phones = r.ContactData?.ContactPhones;
+        return phones is { Count: > 0 } && phones.Any(p => !string.IsNullOrWhiteSpace(p.Phone));
     }
 
     public async Task<int> CountProfilesAsync(ProfileSearchRequest request, CancellationToken cancellationToken = default)

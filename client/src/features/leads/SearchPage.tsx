@@ -87,6 +87,7 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
   const [searchError, setSearchError] = useState<string | null>(null)
   const [selectedResultIds, setSelectedResultIds] = useState<Set<string>>(new Set())
   const [targetCampaign, setTargetCampaign] = useState('')
+  const [contactFilter, setContactFilter] = useState('email')
   const [addFeedback, setAddFeedback] = useState<string | null>(null)
   const [jobTitleSuggestions, setJobTitleSuggestions] = useState<string[]>([])
   const [profileLead, setProfileLead] = useState<Lead | null>(null)
@@ -138,21 +139,22 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
 
   const buildRequest = (): ProfileSearchRequest => {
     const v = getValues()
-    return {
-      keywords: toList(v.keywords),
-      jobTitles: toList(v.jobTitles),
-      jobTitleScope: v.jobTitleScope,
-      companies: toList(v.companies),
-      companyScope: v.companyScope,
-      expertises: toList(v.expertises),
-      expertiseMode: v.expertiseMode,
-      countries: (v.country ?? '').trim() ? [(v.country ?? '').trim()] : undefined,
-      states: toList(v.states),
-      cities: toList(v.cities),
-      pageNumber: 1,
-      pageSize: 100,
-      maxResults: 500,
-    }
+  return {
+        keywords: toList(v.keywords),
+        jobTitles: toList(v.jobTitles),
+        jobTitleScope: v.jobTitleScope,
+        companies: toList(v.companies),
+        companyScope: v.companyScope,
+        expertises: toList(v.expertises),
+        expertiseMode: v.expertiseMode,
+        countries: (v.country ?? '').trim() ? [(v.country ?? '').trim()] : undefined,
+        states: toList(v.states),
+        cities: toList(v.cities),
+        contactFilter,
+        pageNumber: 1,
+        pageSize: 100,
+        maxResults: 500,
+      }
   }
 
   const onAutoBuild = async () => {
@@ -232,12 +234,30 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
     }
   })
 
-  const drillCountry = (country: string) => {
-    setValue('country', country)
-    setValue('states', '')
-    setValue('cities', '')
-    onSearch()
-  }
+const drillCountry = (country: string) => {
+      setValue('country', country)
+      setValue('states', '')
+      setValue('cities', '')
+      onSearch()
+    }
+
+    const onContactFilterChange = async (value: string) => {
+      setContactFilter(value)
+      if (!lastRequest) return
+      setSearchError(null)
+      setAddFeedback(null)
+      setResults(null)
+      setSelectedResultIds(new Set())
+      try {
+        const request = { ...lastRequest, contactFilter: value }
+        const response = await searchRhetorik(request).unwrap()
+        setLastRequest(request)
+        setResults(response)
+        setViewMode(request.cities?.length ? 'candidates' : 'map')
+      } catch {
+        setSearchError('The search failed. Try again or simplify the filters.')
+      }
+    }
 
   const drillState = (state: string) => {
     const current = toList(getValues('states')) ?? []
@@ -339,8 +359,9 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
       <CardHeader>
         <CardTitle>Find candidates</CardTitle>
         <CardDescription>
-          Searches candidate profiles. Every search automatically includes the "Profile Has Email"
-          tag. Up to 500 profiles are shown per search.
+          Searches candidate profiles. Use <strong>Show candidates</strong> to choose whether the
+          results must have an email address, an email or a phone number, or no contact requirement.
+          Up to 500 profiles are shown per search.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -422,6 +443,21 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
               <option value="current">Current</option>
               <option value="past">Past</option>
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="contactFilter">Show candidates</Label>
+            <Select
+              id="contactFilter"
+              value={contactFilter}
+              onChange={(e) => onContactFilterChange(e.target.value)}
+            >
+              <option value="email">With an email address</option>
+              <option value="email_or_phone">With an email or phone number</option>
+              <option value="any">All candidates</option>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Changing this re-runs the search with the same criteria.
+            </p>
           </div>
 
           <div className="space-y-1.5">

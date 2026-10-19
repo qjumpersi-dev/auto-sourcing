@@ -20,12 +20,19 @@ public class ProfileSearchRequest
     public int PageSize { get; set; } = 100;
     public int MaxResults { get; set; } = 500;
 
+    // Which candidates to include: only those with an email, with an email or a phone, or everyone.
+    public string ContactFilter { get; set; } = ContactEmail;
+
     public const string MustHaveAny = "must_have_any";
     public const string MustHaveAll = "must_have_all";
     public const string MustNotHaveAny = "must_not_have_any";
     public const string MustNotHaveAll = "must_not_have_all";
 
     public const string EmailTag = "Profile Has Email";
+
+    public const string ContactEmail = "email";
+    public const string ContactEmailOrPhone = "email_or_phone";
+    public const string ContactAny = "any";
 
     internal Dictionary<string, object> BuildParameters()
     {
@@ -62,13 +69,16 @@ public class ProfileSearchRequest
             };
         }
 
-        AddIsOneOf(parameters, Countries, "countries");
-        AddIsOneOf(parameters, States, "states");
-        AddIsOneOf(parameters, Cities, "cities");
+          AddIsOneOf(parameters, Countries, "countries");
+          AddIsOneOf(parameters, States, "states");
+          AddIsOneOf(parameters, Cities, "cities");
 
-        parameters["profile_tags"] = new[] { new { @operator = "is one of", value = new[] { EmailTag } } };
+          if (string.IsNullOrEmpty(ContactFilter) || ContactFilter == ContactEmail)
+          {
+              parameters["profile_tags"] = new[] { new { @operator = "is one of", value = new[] { EmailTag } } };
+          }
 
-        return parameters;
+          return parameters;
     }
 
     private static void AddIsOneOf(Dictionary<string, object> parameters, List<string>? values, string field)
@@ -250,9 +260,12 @@ public class RhetorikContactDataBlock
     [JsonPropertyName("contact_current_experiences")]
     public IReadOnlyList<RhetorikExperience>? CurrentExperiences { get; set; }
 
-    [JsonPropertyName("contact_emails")]
-    public IReadOnlyList<RhetorikContactEmail>? ContactEmails { get; set; }
-}
+      [JsonPropertyName("contact_emails")]
+      public IReadOnlyList<RhetorikContactEmail>? ContactEmails { get; set; }
+
+      [JsonPropertyName("contact_phones")]
+      public IReadOnlyList<RhetorikContactPhone>? ContactPhones { get; set; }
+  }
 
 public class RhetorikResumeData
 {
@@ -414,6 +427,18 @@ public class AutocompleteSuggestion
 
     [JsonPropertyName("count")]
     public int? Count { get; set; }
+}
+
+public class RhetorikContactPhone
+{
+    [JsonPropertyName("phone")]
+    public string? Phone { get; set; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("priority")]
+    public int? Priority { get; set; }
 }
 
 
