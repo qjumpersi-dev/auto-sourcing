@@ -525,7 +525,13 @@ const drillCountry = (country: string) => {
               <RotateCcw />
               Reset
             </Button>
-            <Badge variant="secondary">Must have email: always on</Badge>
+            <Badge variant={contactFilter === 'any' ? 'outline' : 'secondary'}>
+              {contactFilter === 'email_or_phone'
+                ? 'Must have email or phone'
+                : contactFilter === 'any'
+                  ? 'No contact requirement'
+                  : 'Must have email'}
+            </Badge>
           </div>
         </form>
 
