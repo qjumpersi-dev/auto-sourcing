@@ -27,6 +27,19 @@ Whenever a commit, push, or PR is involved (done by the agent or by the user), a
 
 If the agent runs git itself, still print the equivalent commands so the user can reproduce them in another window.
 
+## Telling the user where to act (always required)
+
+Every instruction the user must carry out has to state exactly **where** to do it. Never say only "deploy", "run this", "restart it" or "rebuild" without the location.
+
+Always use an explicit environment label, for example:
+- **🌐 DROPLET (SSH)** — the production server (repo at `/root/auto-sourcing`).
+- **🖥️ YOUR PC → PowerShell** — local machine, with the exact working directory.
+- **🖥️ YOUR PC → File Explorer / editor**.
+- **🌐 BROWSER** — name the site/URL, and say whether to hard-refresh (Ctrl+Shift+R).
+- **Twilio Console / Azure Portal / Teams admin center / Scotty / GitHub** — name the console and the screen/tab.
+
+Also always give the exact working directory for any command, and name the affected container or service (e.g. `--build web` versus `--build api web`).
+
 ## Build and test
 
 Before committing or requesting a PR, verify the change locally:
