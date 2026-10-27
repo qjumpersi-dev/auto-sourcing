@@ -40,6 +40,8 @@ Always use an explicit environment label, for example:
 
 Also always give the exact working directory for any command, and name the affected container or service (e.g. `--build web` versus `--build api web`).
 
+When a command must run in a specific directory, put the explicit `cd <path>` as the **first line of the command block itself** — do not only mention the directory in prose. The user is not a developer: every step must be copy-pasteable exactly as written, with no assumptions about where they already are.
+
 ## Build and test
 
 Before committing or requesting a PR, verify the change locally:
