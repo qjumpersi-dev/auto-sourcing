@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck, LogOut, UserCog, Users, CalendarClock, X } from 'lucide-react'
+import { UserCheck, Megaphone, Search, ListOrdered, Briefcase, Building2, BarChart3, ShieldCheck, LogOut, UserCog, Users, CalendarClock, Handshake, X } from 'lucide-react'
 import { SearchPage } from '@/features/leads/SearchPage'
 import { LeadsPage } from '@/features/leads/LeadsPage'
 import { CampaignsPage } from '@/features/campaigns/CampaignsPage'
@@ -9,6 +9,7 @@ import { SequencesPage } from '@/features/sequences/SequencesPage'
 import { SequenceEditorPage } from '@/features/sequences/SequenceEditorPage'
 import { JobsPage } from '@/features/jobs/JobsPage'
 import { JobEditorPage } from '@/features/jobs/JobEditorPage'
+import { ClientsPage } from '@/features/clients/ClientsPage'
 import { OrganizationPage } from '@/features/admin/OrganizationPage'
 import { GuardrailsPage } from '@/features/admin/GuardrailsPage'
 import { UsersPage } from '@/features/admin/UsersPage'
@@ -25,7 +26,7 @@ import type { ProfileSearchRequest } from '@/types/models'
 
 type View =
   | { page: 'search'; initialCriteria?: ProfileSearchRequest }
-  | { page: 'leads' | 'campaigns' | 'sequences' | 'jobs' | 'organization' | 'reports' | 'guardrails' | 'users' | 'interviews' }
+  | { page: 'leads' | 'campaigns' | 'sequences' | 'jobs' | 'clients' | 'organization' | 'reports' | 'guardrails' | 'users' | 'interviews' }
   | { page: 'campaign-detail'; campaignId: number }
   | { page: 'sequence-detail'; sequenceId?: number }
   | { page: 'job-detail'; jobId?: number }
@@ -36,6 +37,7 @@ const nav = [
   { key: 'campaigns', label: 'Campaigns', icon: Megaphone },
   { key: 'sequences', label: 'Sequences', icon: ListOrdered },
   { key: 'jobs', label: 'Jobs', icon: Briefcase },
+  { key: 'clients', label: 'Clients', icon: Handshake },
   { key: 'interviews', label: 'Interviews', icon: CalendarClock },
   { key: 'organization', label: 'Organization', icon: Building2 },
   { key: 'guardrails', label: 'Guardrails', icon: ShieldCheck },
@@ -208,8 +210,8 @@ function App() {
               }}
             />
           )}
-          {view.page === 'organization' && <OrganizationPage />}
-          {view.page === 'guardrails' && <GuardrailsPage />}
+          {view.page === 'clients' && <ClientsPage />}
+          {view.page === 'organization' && <OrganizationPage />}          {view.page === 'guardrails' && <GuardrailsPage />}
           {view.page === 'reports' && <ReportsPage />}
           {view.page === 'interviews' && <InterviewsPage />}
           {view.page === 'users' && <UsersPage />}

@@ -433,8 +433,27 @@ export interface Job {
   education: string | null
   skills: string | null
   attractiveReasons: string | null
-  screeningDetails: string | null
-  status: number
+    screeningDetails: string | null
+    clientId: number | null
+    roleFamily: string | null
+    alternativeTitles: string | null
+    adjacentIndustries: string | null
+    vacancies: number
+    shiftPattern: string | null
+    workingHours: string | null
+    onCallRequired: boolean
+    workAuthorisationRequired: boolean
+    sponsorshipAvailable: boolean
+    backgroundChecks: string | null
+    requiredLicences: string | null
+    exclusionCriteria: string | null
+    travelRequirement: string | null
+    relocationRequired: boolean
+    roleSummary: string | null
+    payCurrency: string | null
+    payPeriod: number
+    allowClientNameInMessages: boolean
+    status: number
   createdAt: string
   updatedAt: string | null
 }
@@ -460,9 +479,65 @@ export interface JobInput {
   education?: string | null
   skills?: string | null
   attractiveReasons?: string | null
-  screeningDetails?: string | null
-  status?: number
-}
+    screeningDetails?: string | null
+    clientId?: number | null
+    roleFamily?: string | null
+    alternativeTitles?: string | null
+    adjacentIndustries?: string | null
+    vacancies?: number
+    shiftPattern?: string | null
+    workingHours?: string | null
+    onCallRequired?: boolean
+    workAuthorisationRequired?: boolean
+    sponsorshipAvailable?: boolean
+    backgroundChecks?: string | null
+    requiredLicences?: string | null
+    exclusionCriteria?: string | null
+    travelRequirement?: string | null
+    relocationRequired?: boolean
+    roleSummary?: string | null
+    payCurrency?: string | null
+    payPeriod?: number
+    allowClientNameInMessages?: boolean
+    status?: number
+  }
+
+  export interface Client {
+    id: number
+    name: string
+    contactName: string | null
+    contactEmail: string | null
+    contactPhone: string | null
+    notes: string | null
+    createdAt: string
+    updatedAt: string | null
+  }
+
+  export interface ClientInput {
+    name: string
+    contactName?: string | null
+    contactEmail?: string | null
+    contactPhone?: string | null
+    notes?: string | null
+  }
+
+  export const PayPeriod = {
+    NotSpecified: 0,
+    Hour: 1,
+    Day: 2,
+    Week: 3,
+    Month: 4,
+    Year: 5,
+  } as const
+
+  export const payPeriodLabels: Record<number, string> = {
+    [PayPeriod.NotSpecified]: 'Not specified',
+    [PayPeriod.Hour]: 'Per hour',
+    [PayPeriod.Day]: 'Per day',
+    [PayPeriod.Week]: 'Per week',
+    [PayPeriod.Month]: 'Per month',
+    [PayPeriod.Year]: 'Per year',
+  }
 
 export interface OrganizationProfile {
   id: number

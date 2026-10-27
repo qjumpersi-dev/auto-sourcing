@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import {
   useDeleteJobMutation,
+  useGetClientsQuery,
   useGetJobsQuery,
 } from '@/services/apiSlice'
 import { jobStatusLabels, JobStatus } from '@/types/models'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 
 export function JobsPage({
   onNewJob,
@@ -17,8 +20,15 @@ export function JobsPage({
   onOpenJob: (id: number) => void
 }) {
   const { data: jobs = [], isLoading } = useGetJobsQuery()
+  const { data: clients = [] } = useGetClientsQuery()
   const [deleteJob] = useDeleteJobMutation()
   const [error, setError] = useState<string | null>(null)
+  const [clientFilter, setClientFilter] = useState('')
+
+  const clientNameById = new Map(clients.map((client) => [client.id, client.name]))
+  const visibleJobs = clientFilter
+    ? jobs.filter((job) => String(job.clientId ?? '') === clientFilter)
+    : jobs
 
   const onDelete = async (id: number, title: string) => {
     if (!window.confirm(`Delete the job "${title}"? This cannot be undone.`)) return
@@ -53,21 +63,42 @@ export function JobsPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Your jobs ({jobs.length})</CardTitle>
-          <CardDescription>Click a job to view or edit its details.</CardDescription>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <CardTitle>Your jobs ({visibleJobs.length})</CardTitle>
+              <CardDescription>Click a job to view or edit its details.</CardDescription>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Filter by client</Label>
+              <Select
+                className="w-64"
+                value={clientFilter}
+                onChange={(e) => setClientFilter(e.target.value)}
+              >
+                <option value="">All clients</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="animate-spin" /> Loading...
             </p>
-          ) : jobs.length === 0 ? (
+          ) : visibleJobs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No jobs yet. Create one to get started.
+              {jobs.length === 0
+                ? 'No jobs yet. Create one to get started.'
+                : 'No jobs for this client.'}
             </p>
           ) : (
             <ul className="divide-y">
-              {jobs.map((job) => (
+              {visibleJobs.map((job) => (
                 <li key={job.id}>
                   <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-accent">
                     <button
@@ -77,8 +108,14 @@ export function JobsPage({
                     >
                       <p className="font-medium">{job.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {job.location || 'No location'}
-                        {job.industry ? ` · ${job.industry}` : ''}
+                        {[
+                          clientNameById.get(job.clientId ?? -1),
+                          job.location || 'No location',
+                          job.roleFamily,
+                          job.industry,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </p>
                     </button>
                     <Badge

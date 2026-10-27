@@ -128,6 +128,46 @@ namespace AutoSourcing.Data.Migrations
                     b.ToTable("ChannelConsents");
                 });
 
+            modelBuilder.Entity("AutoSourcing.Core.Entities.Client", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContactEmail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContactName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Clients");
+                });
+
             modelBuilder.Entity("AutoSourcing.Core.Entities.ConversationMessage", b =>
                 {
                     b.Property<int>("Id")
@@ -294,6 +334,9 @@ namespace AutoSourcing.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AdjacentIndustries")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("AdvertCopy")
                         .HasColumnType("nvarchar(max)");
 
@@ -301,8 +344,20 @@ namespace AutoSourcing.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("AllowClientNameInMessages")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("AlternativeTitles")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("AttractiveReasons")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BackgroundChecks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ClientId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -312,6 +367,9 @@ namespace AutoSourcing.Data.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Education")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ExclusionCriteria")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("ExpiryDate")
@@ -338,6 +396,27 @@ namespace AutoSourcing.Data.Migrations
                     b.Property<string>("NiceToHaves")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("OnCallRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PayCurrency")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PayPeriod")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("RelocationRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("RequiredLicences")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RoleFamily")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RoleSummary")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<decimal?>("SalaryFrom")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -356,8 +435,14 @@ namespace AutoSourcing.Data.Migrations
                     b.Property<string>("ScreeningDetails")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ShiftPattern")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Skills")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("SponsorshipAvailable")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("datetime2");
@@ -370,6 +455,9 @@ namespace AutoSourcing.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("TravelRequirement")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("Type")
                         .HasColumnType("int");
 
@@ -378,6 +466,15 @@ namespace AutoSourcing.Data.Migrations
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
+
+                    b.Property<int>("Vacancies")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("WorkAuthorisationRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("WorkingHours")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 

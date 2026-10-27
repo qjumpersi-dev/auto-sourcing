@@ -10,6 +10,8 @@ import type {
   Campaign,
   CampaignReportSummary,
   CandidateReportResponse,
+  Client,
+  ClientInput,
   EnrichedProfileSearchResponse,
   GeneratedContent,
   GenerateContentRequest,
@@ -68,7 +70,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Organization', 'Policy', 'User', 'Interview'],
+  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Client', 'Organization', 'Policy', 'User', 'Interview'],
   endpoints: (builder) => ({
     getAuthStatus: builder.query<AuthStatus, void>({
       query: () => '/auth/status',
@@ -353,6 +355,22 @@ export const apiSlice = createApi({
     generateJobSearch: builder.mutation<ProfileSearchRequest, number>({
       query: (id) => ({ url: `/jobs/${id}/generate-search`, method: 'POST' }),
     }),
+    getClients: builder.query<Client[], void>({
+      query: () => '/clients',
+      providesTags: ['Client'],
+    }),
+    createClient: builder.mutation<Client, ClientInput>({
+      query: (body) => ({ url: '/clients', method: 'POST', body }),
+      invalidatesTags: ['Client'],
+    }),
+    updateClient: builder.mutation<void, { id: number } & ClientInput>({
+      query: ({ id, ...body }) => ({ url: `/clients/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['Client'],
+    }),
+    deleteClient: builder.mutation<void, number>({
+      query: (id) => ({ url: `/clients/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Client', 'Job'],
+    }),
     getOrganization: builder.query<OrganizationProfile, void>({
       query: () => '/organization',
       providesTags: ['Organization'],
@@ -470,6 +488,10 @@ export const {
   useUpdateJobMutation,
   useDeleteJobMutation,
   useGenerateJobSearchMutation,
+  useGetClientsQuery,
+  useCreateClientMutation,
+  useUpdateClientMutation,
+  useDeleteClientMutation,
   useGetOrganizationQuery,
   useUpdateOrganizationMutation,
   useGetPolicyQuery,
