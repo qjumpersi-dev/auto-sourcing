@@ -29,6 +29,7 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate } from '@/lib/formatDate'
 import { LookupField } from '@/components/LookupField'
+import { LookupMultiField } from '@/components/LookupMultiField'
 
 function emptyDraft(): JobInput {
   return {
@@ -270,11 +271,10 @@ export function JobEditorPage({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Job title *</Label>
-                <LookupField
-                  category="job-title"
+                <Input
                   value={draft.title}
-                  onChange={(value) => updateDraft({ title: value })}
-                  placeholder="Select or type a job title"
+                  onChange={(e) => updateDraft({ title: e.target.value })}
+                  placeholder="e.g. Senior Software Engineer"
                 />
               </div>
               <div className="space-y-1.5">
@@ -487,18 +487,20 @@ export function JobEditorPage({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Alternative job titles</Label>
-                <Input
+                <LookupMultiField
+                  category="job-title"
                   value={draft.alternativeTitles ?? ''}
-                  onChange={(e) => updateDraft({ alternativeTitles: e.target.value })}
-                  placeholder="e.g. Facilities Engineer, M&E Engineer"
+                  onChange={(value) => updateDraft({ alternativeTitles: value })}
+                  placeholder="Select or type a job title, then Add"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>Adjacent industries / talent sources</Label>
-                <Input
+                <LookupMultiField
+                  category="industry"
                   value={draft.adjacentIndustries ?? ''}
-                  onChange={(e) => updateDraft({ adjacentIndustries: e.target.value })}
-                  placeholder="e.g. Hospitals, telecoms, utilities, pharma"
+                  onChange={(value) => updateDraft({ adjacentIndustries: value })}
+                  placeholder="Select or type an industry, then Add"
                 />
               </div>
             </div>
