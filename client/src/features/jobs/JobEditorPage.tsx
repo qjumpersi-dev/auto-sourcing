@@ -28,17 +28,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate } from '@/lib/formatDate'
-
-const ROLE_FAMILIES = [
-  'Critical Facilities Engineer',
-  'Commissioning Engineer',
-  'Controls and BMS Engineer',
-  'Field Service Engineer',
-  'Data Centre Technician',
-  'Technician',
-  'Engineer',
-  'Other',
-]
+import { LookupField } from '@/components/LookupField'
 
 function emptyDraft(): JobInput {
   return {
@@ -280,10 +270,11 @@ export function JobEditorPage({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Job title *</Label>
-                <Input
+                <LookupField
+                  category="job-title"
                   value={draft.title}
-                  onChange={(e) => updateDraft({ title: e.target.value })}
-                  placeholder="e.g. Senior Software Engineer"
+                  onChange={(value) => updateDraft({ title: value })}
+                  placeholder="Select or type a job title"
                 />
               </div>
               <div className="space-y-1.5">
@@ -315,17 +306,12 @@ export function JobEditorPage({
               </div>
               <div className="space-y-1.5">
                 <Label>Role family</Label>
-                <Input
-                  list="roleFamilyOptions"
+                <LookupField
+                  category="role-family"
                   value={draft.roleFamily ?? ''}
-                  onChange={(e) => updateDraft({ roleFamily: e.target.value })}
+                  onChange={(value) => updateDraft({ roleFamily: value })}
                   placeholder="e.g. Critical Facilities Engineer"
                 />
-                <datalist id="roleFamilyOptions">
-                  {ROLE_FAMILIES.map((family) => (
-                    <option key={family} value={family} />
-                  ))}
-                </datalist>
               </div>
               <div className="space-y-1.5">
                 <Label>Vacancies</Label>
@@ -343,10 +329,11 @@ export function JobEditorPage({
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label>Industry</Label>
-                <Input
+                <LookupField
+                  category="industry"
                   value={draft.industry ?? ''}
-                  onChange={(e) => updateDraft({ industry: e.target.value })}
-                  placeholder="e.g. Technology"
+                  onChange={(value) => updateDraft({ industry: value })}
+                  placeholder="Select or type an industry"
                 />
               </div>
               <div className="space-y-1.5">

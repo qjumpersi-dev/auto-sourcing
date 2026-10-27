@@ -12,6 +12,7 @@ import type {
   CandidateReportResponse,
   Client,
   ClientInput,
+  LookupValue,
   EnrichedProfileSearchResponse,
   GeneratedContent,
   GenerateContentRequest,
@@ -70,7 +71,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Client', 'Organization', 'Policy', 'User', 'Interview'],
+  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Client', 'Lookup', 'Organization', 'Policy', 'User', 'Interview'],
   endpoints: (builder) => ({
     getAuthStatus: builder.query<AuthStatus, void>({
       query: () => '/auth/status',
@@ -371,6 +372,14 @@ export const apiSlice = createApi({
       query: (id) => ({ url: `/clients/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Client', 'Job'],
     }),
+    getLookups: builder.query<LookupValue[], string>({
+      query: (category) => `/lookups?category=${encodeURIComponent(category)}`,
+      providesTags: ['Lookup'],
+    }),
+    addLookup: builder.mutation<LookupValue, { category: string; value: string }>({
+      query: (body) => ({ url: '/lookups', method: 'POST', body }),
+      invalidatesTags: ['Lookup'],
+    }),
     getOrganization: builder.query<OrganizationProfile, void>({
       query: () => '/organization',
       providesTags: ['Organization'],
@@ -492,6 +501,8 @@ export const {
   useCreateClientMutation,
   useUpdateClientMutation,
   useDeleteClientMutation,
+  useGetLookupsQuery,
+  useAddLookupMutation,
   useGetOrganizationQuery,
   useUpdateOrganizationMutation,
   useGetPolicyQuery,

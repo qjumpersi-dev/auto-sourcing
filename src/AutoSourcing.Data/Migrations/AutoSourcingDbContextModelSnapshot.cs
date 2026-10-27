@@ -684,6 +684,35 @@ namespace AutoSourcing.Data.Migrations
                     b.ToTable("LeadProfiles");
                 });
 
+            modelBuilder.Entity("AutoSourcing.Core.Entities.LookupValue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("LookupValues");
+                });
+
             modelBuilder.Entity("AutoSourcing.Core.Entities.OrganizationProfile", b =>
                 {
                     b.Property<int>("Id")

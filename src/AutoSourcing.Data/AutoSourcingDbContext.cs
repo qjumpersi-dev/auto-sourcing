@@ -65,6 +65,7 @@ public class AutoSourcingDbContext : DbContext
     public DbSet<SequenceStep> SequenceSteps => Set<SequenceStep>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<Client> Clients => Set<Client>();
+    public DbSet<LookupValue> LookupValues => Set<LookupValue>();
     public DbSet<OrganizationProfile> OrganizationProfiles => Set<OrganizationProfile>();
     public DbSet<ChannelConsent> ChannelConsents => Set<ChannelConsent>();
     public DbSet<LeadProfile> LeadProfiles => Set<LeadProfile>();
@@ -103,6 +104,7 @@ public class AutoSourcingDbContext : DbContext
         modelBuilder.Entity<SequenceStep>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
         modelBuilder.Entity<Job>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
         modelBuilder.Entity<Client>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
+        modelBuilder.Entity<LookupValue>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
         modelBuilder.Entity<OrganizationProfile>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
         modelBuilder.Entity<PolicyGuardrails>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
         modelBuilder.Entity<OutreachMessage>().HasQueryFilter(e => CurrentUserId == null || e.UserId == CurrentUserId);
@@ -117,6 +119,7 @@ public class AutoSourcingDbContext : DbContext
                  {
                      typeof(Lead), typeof(Campaign), typeof(Sequence), typeof(SequenceStep), typeof(Job),
                      typeof(Client),
+                     typeof(LookupValue),
                      typeof(OrganizationProfile), typeof(PolicyGuardrails), typeof(OutreachMessage),
                      typeof(LeadEmail), typeof(ChannelConsent), typeof(ConversationMessage), typeof(LeadProfile),
                      typeof(Interview), typeof(InterviewAttendee)

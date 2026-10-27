@@ -521,6 +521,13 @@ export interface JobInput {
     notes?: string | null
   }
 
+  export interface LookupValue {
+    id: number
+    category: string
+    value: string
+    createdAt: string
+  }
+
   export const PayPeriod = {
     NotSpecified: 0,
     Hour: 1,
