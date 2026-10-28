@@ -28,6 +28,17 @@ public class PersonalizationServiceTests
     }
 
     [Fact]
+    public void RenderTemplate_ReplacesChatUrl()
+    {
+        var lead = SampleLead();
+        lead.Id = 42;
+
+        var result = _sut.RenderTemplate("Chat here: {{ChatUrl}}", lead);
+
+        Assert.Equal("Chat here: https://app.test/api/agent/42", result);
+    }
+
+    [Fact]
     public void RenderTemplate_ReplacesCompanyWithFallback_WhenMissing()
     {
         var lead = SampleLead();

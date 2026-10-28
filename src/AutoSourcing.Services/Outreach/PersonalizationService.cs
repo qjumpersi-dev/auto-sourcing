@@ -52,7 +52,8 @@ public class PersonalizationService : IPersonalizationService
             ["{{LeadLocation}}"] = lead.Location ?? string.Empty,
             ["{{JobUrl}}"] = jobUrl ?? string.Empty,
             ["{{OrgName}}"] = orgName ?? string.Empty,
-            ["{{ConsentUrl}}"] = $"{_emailOptions.PublicBaseUrl?.TrimEnd('/')}/api/consent/{lead.Id}"
+            ["{{ConsentUrl}}"] = $"{_emailOptions.PublicBaseUrl?.TrimEnd('/')}/api/consent/{lead.Id}",
+            ["{{ChatUrl}}"] = $"{_emailOptions.PublicBaseUrl?.TrimEnd('/')}/api/agent/{lead.Id}"
         };
 
         return replacements.Aggregate(expanded, (current, pair) =>
