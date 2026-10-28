@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LeadProfileModal } from './LeadProfileModal'
+import { ValueChips } from '@/components/ValueChips'
 import { LocationMapPanel } from './LocationMapPanel'
 
 interface SearchFormValues {
@@ -98,7 +99,7 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
   const [selectedJobId, setSelectedJobId] = useState('')
   const [viewMode, setViewMode] = useState<'map' | 'candidates'>('map')
 
-  const { register, handleSubmit, getValues, setValue, reset, formState: { errors } } = useForm<SearchFormValues>({
+  const { register, handleSubmit, getValues, setValue, reset, watch, formState: { errors } } = useForm<SearchFormValues>({
     defaultValues: {
         freeText: '',
         keywords: '',
@@ -116,6 +117,8 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
       cities: '',
     },
   })
+
+  const watched = watch()
 
   useEffect(() => {
     if (initialCriteria) {
@@ -421,11 +424,16 @@ const drillCountry = (country: string) => {
           <div className="space-y-1.5">
             <Label htmlFor="keywords">Keywords</Label>
             <Input id="keywords" placeholder="recruiter, talent" {...register('keywords')} />
+            <ValueChips value={watched.keywords ?? ''} />
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="jobTitles">Job titles</Label>
             <Input id="jobTitles" placeholder="Developer" {...register('jobTitles')} />
+            <ValueChips value={watched.jobTitles ?? ''} />
+            <p className="text-xs text-muted-foreground">
+              Separate multiple job titles with commas — the search matches any of them.
+            </p>
             {errors.jobTitles && (
               <p className="text-xs text-destructive">{errors.jobTitles.message}</p>
             )}
@@ -480,14 +488,17 @@ const drillCountry = (country: string) => {
           <div className="space-y-1.5">
             <Label htmlFor="excludeKeywords">Exclude keywords</Label>
             <Input id="excludeKeywords" placeholder="e.g. internship" {...register('excludeKeywords')} />
+            <ValueChips value={watched.excludeKeywords ?? ''} verb="Excludes" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="excludeJobTitles">Exclude job titles</Label>
             <Input id="excludeJobTitles" placeholder="e.g. Sales Manager" {...register('excludeJobTitles')} />
+            <ValueChips value={watched.excludeJobTitles ?? ''} verb="Excludes" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="excludeCompanies">Exclude companies</Label>
             <Input id="excludeCompanies" placeholder="e.g. Google" {...register('excludeCompanies')} />
+            <ValueChips value={watched.excludeCompanies ?? ''} verb="Excludes" />
             <p className="text-xs text-muted-foreground">
               Uses the company scope above (current / past / any).
             </p>
@@ -496,6 +507,7 @@ const drillCountry = (country: string) => {
           <div className="space-y-1.5">
             <Label htmlFor="companies">Companies</Label>
             <Input id="companies" placeholder="Acme Corp" {...register('companies')} />
+            <ValueChips value={watched.companies ?? ''} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="companyScope">Company scope</Label>
