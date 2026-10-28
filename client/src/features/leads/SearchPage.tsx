@@ -22,6 +22,7 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LeadProfileModal } from './LeadProfileModal'
 import { ValueChips } from '@/components/ValueChips'
+import { TagInput } from '@/components/TagInput'
 import { LocationMapPanel } from './LocationMapPanel'
 
 interface SearchFormValues {
@@ -472,10 +473,13 @@ const drillCountry = (country: string) => {
 
           <div className="space-y-1.5">
             <Label htmlFor="jobTitles">Job titles</Label>
-            <Input id="jobTitles" placeholder="Developer" {...register('jobTitles')} />
-            <ValueChips value={watched.jobTitles ?? ''} />
+            <TagInput
+              value={watched.jobTitles ?? ''}
+              onChange={(value) => setValue('jobTitles', value)}
+              placeholder="Type a job title, then Enter"
+            />
             <p className="text-xs text-muted-foreground">
-              Separate multiple job titles with commas — the search matches any of them.
+              Add several job titles — the search matches any of them. Click × to remove one.
             </p>
             {titleNormalisations.length > 0 && (
               <div className="space-y-1 rounded-md border bg-muted/30 p-2">
