@@ -23,18 +23,21 @@ import { LeadProfileModal } from './LeadProfileModal'
 import { LocationMapPanel } from './LocationMapPanel'
 
 interface SearchFormValues {
-  freeText: string
-  keywords: string
-  jobTitles: string
-  jobTitleScope: Scope
-  companies: string
-  companyScope: Scope
-  expertises: string
-  expertiseMode: ExpertiseMode
-  country: string
-  states: string
-  cities: string
-}
+    freeText: string
+    keywords: string
+    excludeKeywords: string
+    jobTitles: string
+    excludeJobTitles: string
+    jobTitleScope: Scope
+    companies: string
+    excludeCompanies: string
+    companyScope: Scope
+    expertises: string
+    expertiseMode: ExpertiseMode
+    country: string
+    states: string
+    cities: string
+  }
 
 const expertiseModeLabels: Record<ExpertiseMode, string> = {
   must_have_any: 'Must have any',
@@ -97,12 +100,15 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
 
   const { register, handleSubmit, getValues, setValue, reset, formState: { errors } } = useForm<SearchFormValues>({
     defaultValues: {
-      freeText: '',
-      keywords: '',
-      jobTitles: '',
-      jobTitleScope: 'any',
-      companies: '',
-      companyScope: 'current',
+        freeText: '',
+        keywords: '',
+        excludeKeywords: '',
+        jobTitles: '',
+        excludeJobTitles: '',
+        jobTitleScope: 'any',
+        companies: '',
+        excludeCompanies: '',
+        companyScope: 'current',
       expertises: '',
       expertiseMode: 'must_have_any',
       country: '',
@@ -141,9 +147,12 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
     const v = getValues()
   return {
         keywords: toList(v.keywords),
+        excludeKeywords: toList(v.excludeKeywords),
         jobTitles: toList(v.jobTitles),
+        excludeJobTitles: toList(v.excludeJobTitles),
         jobTitleScope: v.jobTitleScope,
         companies: toList(v.companies),
+        excludeCompanies: toList(v.excludeCompanies),
         companyScope: v.companyScope,
         expertises: toList(v.expertises),
         expertiseMode: v.expertiseMode,
@@ -457,6 +466,30 @@ const drillCountry = (country: string) => {
             </Select>
             <p className="text-xs text-muted-foreground">
               Changing this re-runs the search with the same criteria.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 md:col-span-3">
+            <div className="rounded-md border bg-muted/30 p-3">
+              <p className="text-sm font-medium">Exclude (must not have)</p>
+              <p className="text-xs text-muted-foreground">
+                Candidates matching any of these are removed from the results.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="excludeKeywords">Exclude keywords</Label>
+            <Input id="excludeKeywords" placeholder="e.g. internship" {...register('excludeKeywords')} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="excludeJobTitles">Exclude job titles</Label>
+            <Input id="excludeJobTitles" placeholder="e.g. Sales Manager" {...register('excludeJobTitles')} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="excludeCompanies">Exclude companies</Label>
+            <Input id="excludeCompanies" placeholder="e.g. Google" {...register('excludeCompanies')} />
+            <p className="text-xs text-muted-foreground">
+              Uses the company scope above (current / past / any).
             </p>
           </div>
 

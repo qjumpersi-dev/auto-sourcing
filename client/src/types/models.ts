@@ -210,11 +210,14 @@ export type ExpertiseMode =
 
 export interface ProfileSearchRequest {
   profileIds?: string[]
-  keywords?: string[]
-  jobTitles?: string[]
-  jobTitleScope?: Scope
-  companies?: string[]
-  companyScope?: Scope
+    keywords?: string[]
+    excludeKeywords?: string[]
+    jobTitles?: string[]
+    excludeJobTitles?: string[]
+    jobTitleScope?: Scope
+    companies?: string[]
+    excludeCompanies?: string[]
+    companyScope?: Scope
   expertises?: string[]
   expertiseMode?: ExpertiseMode
   countries?: string[]

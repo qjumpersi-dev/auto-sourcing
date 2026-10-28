@@ -6,9 +6,12 @@ public class ProfileSearchRequest
 {
     public List<string> ProfileIds { get; set; } = [];
     public List<string> Keywords { get; set; } = [];
+    public List<string> ExcludeKeywords { get; set; } = [];
     public List<string> JobTitles { get; set; } = [];
+    public List<string> ExcludeJobTitles { get; set; } = [];
     public string JobTitleScope { get; set; } = "any";
     public List<string> Companies { get; set; } = [];
+    public List<string> ExcludeCompanies { get; set; } = [];
     public string CompanyScope { get; set; } = "current";
     public List<string> Expertises { get; set; } = [];
     public string ExpertiseMode { get; set; } = "must_have_any";
@@ -40,23 +43,20 @@ public class ProfileSearchRequest
 
         AddIsOneOf(parameters, ProfileIds, "profile_id");
 
-        if (Keywords is { Count: > 0 })
-        {
-            parameters["keywords"] = new[] { new { @operator = "is one of", value = Keywords } };
-        }
+          AddIncludeExclude(parameters, Keywords, ExcludeKeywords, "keywords");
 
-        AddIsOneOf(parameters, JobTitles, JobTitleScope switch
-        {
-            "current" => "current_job_titles",
-            "past" => "previous_job_titles",
-            _ => "job_titles"
-        });
+          AddIncludeExclude(parameters, JobTitles, ExcludeJobTitles, JobTitleScope switch
+          {
+              "current" => "current_job_titles",
+              "past" => "previous_job_titles",
+              _ => "job_titles"
+          });
 
-        AddIsOneOf(parameters, Companies, CompanyScope switch
-        {
-            "past" => "previous_company_names",
-            _ => CompanyScope == "any" ? "company_names" : "current_company_names"
-        });
+          AddIncludeExclude(parameters, Companies, ExcludeCompanies, CompanyScope switch
+          {
+              "past" => "previous_company_names",
+              _ => CompanyScope == "any" ? "company_names" : "current_company_names"
+          });
 
         if (Expertises is { Count: > 0 })
         {
@@ -79,6 +79,27 @@ public class ProfileSearchRequest
           }
 
           return parameters;
+    }
+
+    private static void AddIncludeExclude(
+        Dictionary<string, object> parameters,
+        List<string>? include,
+        List<string>? exclude,
+        string field)
+    {
+        var filters = new List<object>();
+        if (include is { Count: > 0 })
+        {
+            filters.Add(new { @operator = "is one of", value = include });
+        }
+        if (exclude is { Count: > 0 })
+        {
+            filters.Add(new { @operator = "is not one of", value = exclude });
+        }
+        if (filters.Count > 0)
+        {
+            parameters[field] = filters.ToArray();
+        }
     }
 
     private static void AddIsOneOf(Dictionary<string, object> parameters, List<string>? values, string field)
