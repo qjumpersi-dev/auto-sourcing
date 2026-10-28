@@ -588,6 +588,28 @@ export interface JobInput {
     checks: QualificationCheck[]
   }
 
+  export interface FunnelCounts {
+    identified: number
+    contacted: number
+    engaged: number
+    qualified: number
+    interviewReady: number
+    interviewScheduled: number
+    interviewHeld: number
+  }
+
+  export interface FunnelGroup {
+    key: string
+    counts: FunnelCounts
+  }
+
+  export interface TalentFunnelReport {
+    overall: FunnelCounts
+    byClient: FunnelGroup[]
+    byRoleFamily: FunnelGroup[]
+    byIndustry: FunnelGroup[]
+  }
+
   export const PayPeriod = {
     NotSpecified: 0,
     Hour: 1,

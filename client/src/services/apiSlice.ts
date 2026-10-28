@@ -15,6 +15,7 @@ import type {
   LookupValue,
   CandidateQualification,
   QualificationCheck,
+  TalentFunnelReport,
   EnrichedProfileSearchResponse,
   GeneratedContent,
   GenerateContentRequest,
@@ -332,6 +333,19 @@ export const apiSlice = createApi({
     getCampaignReportCandidates: builder.query<CandidateReportResponse, number>({
       query: (campaignId) => `/reports/campaign/${campaignId}/candidates`,
     }),
+    getTalentFunnel: builder.query<
+      TalentFunnelReport,
+      { clientId?: number; roleFamily?: string; industry?: string }
+    >({
+      query: ({ clientId, roleFamily, industry }) => {
+        const params = new URLSearchParams()
+        if (clientId) params.set('clientId', String(clientId))
+        if (roleFamily) params.set('roleFamily', roleFamily)
+        if (industry) params.set('industry', industry)
+        const qs = params.toString()
+        return `/reports/talent-funnel${qs ? `?${qs}` : ''}`
+      },
+    }),
     getSequences: builder.query<Sequence[], void>({
       query: () => '/sequences',
       providesTags: ['Sequence'],
@@ -554,6 +568,7 @@ export const {
   useGetMessagesQuery,
   useGetCampaignReportQuery,
   useGetCampaignReportCandidatesQuery,
+  useGetTalentFunnelQuery,
   useCreateDraftMutation,
   useSendMessageMutation,
   useUpdateCampaignMutation,
