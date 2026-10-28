@@ -4,6 +4,8 @@ import { Loader2, Plus } from 'lucide-react'
 import {
   useCreateCampaignMutation,
   useGetCampaignsQuery,
+  useGetClientsQuery,
+  useGetJobsQuery,
   useGetSequencesQuery,
 } from '@/services/apiSlice'
 import { campaignStatusLabels } from '@/types/models'
@@ -24,6 +26,8 @@ interface CampaignFormValues {
 export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number) => void }) {
   const { data: campaigns = [], isLoading } = useGetCampaignsQuery()
   const { data: sequences = [] } = useGetSequencesQuery()
+  const { data: jobs = [] } = useGetJobsQuery()
+  const { data: clients = [] } = useGetClientsQuery()
   const [createCampaign, { isLoading: creating }] = useCreateCampaignMutation()
   const {
     register,
@@ -32,8 +36,26 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
     formState: { errors },
   } = useForm<CampaignFormValues>()
   const [error, setError] = useState<string | null>(null)
+  const [clientFilter, setClientFilter] = useState('')
 
   const sequenceNameById = new Map(sequences.map((sequence) => [sequence.id, sequence.name]))
+  const jobById = new Map(jobs.map((job) => [job.id, job]))
+  const clientNameById = new Map(clients.map((client) => [client.id, client.name]))
+
+  const campaignClientName = (campaign: (typeof campaigns)[number]): string | null => {
+    const job = campaign.jobId ? jobById.get(campaign.jobId) : undefined
+    if (!job?.clientId) {
+      return null
+    }
+    return clientNameById.get(job.clientId) ?? null
+  }
+
+  const visibleCampaigns = clientFilter
+    ? campaigns.filter((campaign) => {
+        const job = campaign.jobId ? jobById.get(campaign.jobId) : undefined
+        return String(job?.clientId ?? '') === clientFilter
+      })
+    : campaigns
 
   const onSubmit = handleSubmit(async (values) => {
     setError(null)
@@ -103,17 +125,38 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
 
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>Campaigns</CardTitle>
-          <CardDescription>Click a campaign to choose its sequence and run it.</CardDescription>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <CardTitle>Campaigns</CardTitle>
+              <CardDescription>Click a campaign to choose its sequence and run it.</CardDescription>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Filter by client</Label>
+              <Select
+                className="w-56"
+                value={clientFilter}
+                onChange={(e) => setClientFilter(e.target.value)}
+              >
+                <option value="">All clients</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : campaigns.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No campaigns yet.</p>
+          ) : visibleCampaigns.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {campaigns.length === 0 ? 'No campaigns yet.' : 'No campaigns for this client.'}
+            </p>
           ) : (
             <ul className="divide-y">
-              {campaigns.map((campaign) => (
+              {visibleCampaigns.map((campaign) => (
                 <li key={campaign.id}>
                   <button
                     type="button"
@@ -123,10 +166,16 @@ export function CampaignsPage({ onOpenCampaign }: { onOpenCampaign: (id: number)
                     <div>
                       <p className="font-medium">{campaign.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {campaign.sequenceId
-                          ? `Sequence: ${sequenceNameById.get(campaign.sequenceId) ?? `#${campaign.sequenceId}`}`
-                          : 'No sequence selected'}
-                        {campaign.description ? ` · ${campaign.description}` : ''}
+                        {[
+                          campaignClientName(campaign),
+                          campaign.jobId ? jobById.get(campaign.jobId)?.title : null,
+                          campaign.sequenceId
+                            ? `Sequence: ${sequenceNameById.get(campaign.sequenceId) ?? `#${campaign.sequenceId}`}`
+                            : 'No sequence selected',
+                          campaign.description,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </p>
                     </div>
                     <Badge variant="secondary">

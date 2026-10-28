@@ -4,6 +4,8 @@ import {
   useGetCampaignReportCandidatesQuery,
   useGetCampaignReportQuery,
   useGetCampaignsQuery,
+  useGetClientsQuery,
+  useGetJobsQuery,
 } from '@/services/apiSlice'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +17,9 @@ import { formatDate } from '@/lib/formatDate'
 
 export function ReportsPage() {
   const { data: campaigns = [] } = useGetCampaignsQuery()
+  const { data: jobs = [] } = useGetJobsQuery()
+  const { data: clients = [] } = useGetClientsQuery()
+  const [clientFilter, setClientFilter] = useState<string>('')
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('')
   const [reportCampaignId, setReportCampaignId] = useState<number | null>(null)
 
@@ -32,6 +37,24 @@ export function ReportsPage() {
   const loading = summaryLoading || candidatesLoading
   const error = summaryError || candidatesError ? 'Could not load the report.' : null
   const candidates = candidatesReport?.candidates ?? []
+
+  const jobById = new Map(jobs.map((job) => [job.id, job]))
+  const clientNameById = new Map(clients.map((client) => [client.id, client.name]))
+
+  const campaignClientId = (campaign: (typeof campaigns)[number]): string => {
+    const job = campaign.jobId ? jobById.get(campaign.jobId) : undefined
+    return job?.clientId ? String(job.clientId) : ''
+  }
+
+  const visibleCampaigns = clientFilter
+    ? campaigns.filter((campaign) => campaignClientId(campaign) === clientFilter)
+    : campaigns
+
+  const selectedCampaign = campaigns.find((campaign) => String(campaign.id) === selectedCampaignId)
+  const selectedJob = selectedCampaign?.jobId ? jobById.get(selectedCampaign.jobId) : undefined
+  const selectedClientName = selectedJob?.clientId
+    ? clientNameById.get(selectedJob.clientId)
+    : undefined
 
   const loadReport = () => {
     if (!selectedCampaignId) return
@@ -53,7 +76,25 @@ export function ReportsPage() {
           <CardDescription>Choose a campaign to view its report.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end gap-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Client</Label>
+              <Select
+                className="w-56"
+                value={clientFilter}
+                onChange={(e) => {
+                  setClientFilter(e.target.value)
+                  setSelectedCampaignId('')
+                }}
+              >
+                <option value="">All clients</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label>Campaign</Label>
               <Select
@@ -62,7 +103,7 @@ export function ReportsPage() {
                 onChange={(e) => setSelectedCampaignId(e.target.value)}
               >
                 <option value="">Pick a campaign...</option>
-                {campaigns.map((c) => (
+                {visibleCampaigns.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -74,6 +115,11 @@ export function ReportsPage() {
               Load report
             </Button>
           </div>
+          {selectedCampaign && (selectedClientName || selectedJob) && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {[selectedClientName, selectedJob?.title].filter(Boolean).join(' · ')}
+            </p>
+          )}
           {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
         </CardContent>
       </Card>
