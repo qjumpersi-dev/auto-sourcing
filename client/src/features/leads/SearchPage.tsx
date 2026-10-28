@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { LeadProfileModal } from './LeadProfileModal'
 import { ValueChips } from '@/components/ValueChips'
 import { TagInput } from '@/components/TagInput'
+import { findCitiesWithinRadius } from './cityRadius'
 import { LocationMapPanel } from './LocationMapPanel'
 
 interface SearchFormValues {
@@ -94,6 +95,8 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
   const [selectedResultIds, setSelectedResultIds] = useState<Set<string>>(new Set())
   const [targetCampaign, setTargetCampaign] = useState('')
   const [contactFilter, setContactFilter] = useState('email')
+  const [radiusMiles, setRadiusMiles] = useState(0)
+  const [radiusNotice, setRadiusNotice] = useState<string | null>(null)
   const [addFeedback, setAddFeedback] = useState<string | null>(null)
   const [jobTitleSuggestions, setJobTitleSuggestions] = useState<string[]>([])
   const [profileLead, setProfileLead] = useState<Lead | null>(null)
@@ -165,6 +168,37 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
   }
 
   useEffect(() => {
+    let cancelled = false
+    if (radiusMiles === 0) {
+      setRadiusNotice(null)
+      return
+    }
+
+    if (!(watched.cities ?? '').trim()) {
+      setRadiusNotice('Enter a city to use a radius.')
+      return
+    }
+
+    const run = async () => {
+      const radius = await findCitiesWithinRadius(
+        watched.cities ?? '',
+        watched.country ?? '',
+        watched.states ?? '',
+        radiusMiles,
+      )
+      if (cancelled) {
+        return
+      }
+      setRadiusNotice(radius?.note ?? 'Could not find that city to calculate a radius.')
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [radiusMiles, watched.cities, watched.country, watched.states])
+
+  useEffect(() => {
     if (initialCriteria) {
       if (initialCriteria.jobTitles?.length) {
         setValue('jobTitles', initialCriteria.jobTitles.join(', '))
@@ -190,9 +224,25 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
     }
   }, [initialCriteria, setValue])
 
-  const buildRequest = (): ProfileSearchRequest => {
+  const buildRequest = (extraCities: string[] = []): ProfileSearchRequest => {
     const v = getValues()
-  return {
+    const baseCities = toList(v.cities) ?? []
+    const mergedCities = (() => {
+      if (extraCities.length === 0) {
+        return baseCities.length > 0 ? baseCities : undefined
+      }
+      const seen = new Set<string>()
+      const merged: string[] = []
+      for (const city of [...baseCities, ...extraCities]) {
+        const key = city.toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        merged.push(city)
+      }
+      return merged
+    })()
+
+    return {
         keywords: toList(v.keywords),
         excludeKeywords: toList(v.excludeKeywords),
         jobTitles: toList(v.jobTitles),
@@ -205,7 +255,7 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
         expertiseMode: v.expertiseMode,
         countries: (v.country ?? '').trim() ? [(v.country ?? '').trim()] : undefined,
         states: toList(v.states),
-        cities: toList(v.cities),
+        cities: mergedCities,
         contactFilter,
         pageNumber: 1,
         pageSize: 100,
@@ -244,6 +294,8 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
     setAddFeedback(null)
     setSelectedJobId('')
     setViewMode('map')
+    setRadiusMiles(0)
+    setRadiusNotice(null)
   }
 
   const onJobSelect = async (jobId: string) => {
@@ -279,9 +331,23 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
     setAddFeedback(null)
     setResults(null)
     setSelectedResultIds(new Set())
-    try {
-      const request = buildRequest()
-      const response = await searchRhetorik(request).unwrap()
+      try {
+        let extraCities: string[] = []
+        if (radiusMiles > 0) {
+          const radius = await findCitiesWithinRadius(
+            getValues().cities ?? '',
+            getValues().country ?? '',
+            getValues().states ?? '',
+            radiusMiles,
+          )
+          extraCities = radius?.names ?? []
+          setRadiusNotice(radius?.note ?? 'Could not find that city to calculate a radius.')
+        } else {
+          setRadiusNotice(null)
+        }
+
+        const request = buildRequest(extraCities)
+        const response = await searchRhetorik(request).unwrap()
       setLastRequest(request)
       setResults(response)
       setViewMode(request.cities?.length ? 'candidates' : 'map')
@@ -625,6 +691,19 @@ const drillCountry = (country: string) => {
               onChange={(v) => setValue('cities', v)}
               placeholder="Start typing a city..."
             />
+            <Label htmlFor="radius" className="pt-1 text-xs text-muted-foreground">
+              Include nearby towns
+            </Label>
+            <Select
+              id="radius"
+              value={String(radiusMiles)}
+              onChange={(e) => setRadiusMiles(Number(e.target.value))}
+            >
+              <option value="0">This city only</option>
+              <option value="30">Within 30 miles</option>
+              <option value="50">Within 50 miles</option>
+            </Select>
+            {radiusNotice && <p className="text-xs text-muted-foreground">{radiusNotice}</p>}
           </div>
 
           <div className="flex items-center gap-3 md:col-span-3">
