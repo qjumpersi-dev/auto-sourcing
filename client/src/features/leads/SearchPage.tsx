@@ -5,8 +5,9 @@ import {
   useGetCampaignsQuery,
   useGenerateSearchSpecMutation,
   useGenerateJobSearchMutation,
-  useGetJobsQuery,
-  useImportFromRhetorikMutation,
+    useGetJobsQuery,
+    useGetLookupsQuery,
+    useImportFromRhetorikMutation,
   useImportToCampaignMutation,
   useSearchRhetorikMutation,
 } from '@/services/apiSlice'
@@ -119,6 +120,48 @@ export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearc
   })
 
   const watched = watch()
+
+  const { data: jobTitleLookups = [] } = useGetLookupsQuery('job-title')
+  const { data: roleFamilyLookups = [] } = useGetLookupsQuery('role-family')
+
+  const canonicalTitles = (() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const item of [...jobTitleLookups, ...roleFamilyLookups]) {
+      const key = item.value.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      result.push(item.value)
+    }
+    return result
+  })()
+
+  const titleNormalisations = (() => {
+    const values = toList(watched.jobTitles ?? '') ?? []
+    const suggestions: { from: string; to: string }[] = []
+    for (const value of values) {
+      const lower = value.toLowerCase()
+      if (canonicalTitles.some((canonical) => canonical.toLowerCase() === lower)) continue
+      const match = canonicalTitles
+        .filter((canonical) => canonical.length >= 4 && lower.includes(canonical.toLowerCase()))
+        .sort((a, b) => b.length - a.length)[0]
+      if (match) suggestions.push({ from: value, to: match })
+    }
+    return suggestions
+  })()
+
+  const applyNormalisation = (from: string, to: string) => {
+    const values = toList(watched.jobTitles ?? '') ?? []
+    const replaced = values.map((value) => (value.toLowerCase() === from.toLowerCase() ? to : value))
+    const seen = new Set<string>()
+    const deduped = replaced.filter((value) => {
+      const key = value.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    setValue('jobTitles', deduped.join(', '))
+  }
 
   useEffect(() => {
     if (initialCriteria) {
@@ -434,6 +477,25 @@ const drillCountry = (country: string) => {
             <p className="text-xs text-muted-foreground">
               Separate multiple job titles with commas — the search matches any of them.
             </p>
+            {titleNormalisations.length > 0 && (
+              <div className="space-y-1 rounded-md border bg-muted/30 p-2">
+                <p className="text-xs font-medium">Standardise for better matching</p>
+                {titleNormalisations.map(({ from, to }) => (
+                  <div key={from} className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="text-muted-foreground">{from} →</span>
+                    <span className="rounded-full border bg-background px-2 py-0.5">{to}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => applyNormalisation(from, to)}
+                    >
+                      Use
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
             {errors.jobTitles && (
               <p className="text-xs text-destructive">{errors.jobTitles.message}</p>
             )}

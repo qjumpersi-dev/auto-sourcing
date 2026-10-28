@@ -11,12 +11,17 @@ public interface IJobService
 public class JobService : IJobService
 {
     public ProfileSearchRequest BuildSearchSpecFromJob(Job job)
-    {
-        var request = new ProfileSearchRequest();
+    {        var request = new ProfileSearchRequest();
 
-        if (!string.IsNullOrWhiteSpace(job.Title))
+        if (!string.IsNullOrWhiteSpace(job.Title) ||
+            !string.IsNullOrWhiteSpace(job.RoleFamily) ||
+            !string.IsNullOrWhiteSpace(job.AlternativeTitles))
         {
-            request.JobTitles = new List<string> { job.Title };
+            var titles = new List<string>();
+            AddTitles(titles, job.RoleFamily);
+            AddTitles(titles, job.AlternativeTitles);
+            AddTitles(titles, job.Title);
+            request.JobTitles = titles.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         if (!string.IsNullOrWhiteSpace(job.Location))
@@ -88,5 +93,18 @@ public class JobService : IJobService
         }
 
         return request;
+    }
+
+    private static void AddTitles(List<string> titles, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        titles.AddRange(value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Trim())
+            .Where(part => part.Length > 0));
     }
 }

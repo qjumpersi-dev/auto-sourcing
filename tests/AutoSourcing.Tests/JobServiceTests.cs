@@ -55,4 +55,22 @@ public class JobServiceTests
         Assert.Empty(request.States);
         Assert.Empty(request.Countries);
     }
+
+    [Fact]
+    public void JobTitles_IncludeRoleFamilyAndAlternativeTitles()
+    {
+        var job = new Job
+        {
+            Title = "Data Center Technician II, Global Server Operations",
+            RoleFamily = "Data Centre Technician",
+            AlternativeTitles = "Data Centre Engineer, DC Technician",
+        };
+
+        var request = _service.BuildSearchSpecFromJob(job);
+
+        Assert.Contains("Data Centre Technician", request.JobTitles);
+        Assert.Contains("Data Centre Engineer", request.JobTitles);
+        Assert.Contains("DC Technician", request.JobTitles);
+        Assert.Contains("Data Center Technician II", request.JobTitles);
+    }
 }
