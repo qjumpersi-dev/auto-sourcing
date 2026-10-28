@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AutoSourcing.Core.Enums;
 using AutoSourcing.Services.Agent;
+using AutoSourcing.Services.Qualification;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AutoSourcing.API.Controllers;
@@ -13,11 +15,16 @@ public class McpController : ControllerBase
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ICandidateAgentService _agentService;
+    private readonly ICandidateQualificationService _qualificationService;
     private readonly ILogger<McpController> _logger;
 
-    public McpController(ICandidateAgentService agentService, ILogger<McpController> logger)
+    public McpController(
+        ICandidateAgentService agentService,
+        ICandidateQualificationService qualificationService,
+        ILogger<McpController> logger)
     {
         _agentService = agentService;
+        _qualificationService = qualificationService;
         _logger = logger;
     }
 
@@ -195,9 +202,30 @@ public class McpController : ControllerBase
                     {
                         ["slot"] = new JsonObject { ["type"] = "integer", ["description"] = "The new option number the candidate chose." }
                     },
-                    ["required"] = new JsonArray("slot")
+                      ["required"] = new JsonArray("slot")
+                  }),
+            Tool("get_interview_ready_checklist",
+                "Get the candidate's interview-ready checklist: the fixed checks, the question to ask, the expected answer from the job brief, and the current status. Call this before qualifying a candidate.",
+                new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject()
+                }),
+            Tool("save_checklist_answer",
+                "Record the candidate's answer for one interview-ready check. Use the criterion name from get_interview_ready_checklist.",
+                new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["criterion"] = new JsonObject { ["type"] = "string", ["description"] = "The check, e.g. role_relevance, work_hours, location, pay, work_authorisation, background_checks, licences, interest." },
+                        ["status"] = new JsonObject { ["type"] = "string", ["description"] = "met, not_met, not_applicable or unknown." },
+                        ["answer"] = new JsonObject { ["type"] = "string", ["description"] = "What the candidate said." },
+                        ["notes"] = new JsonObject { ["type"] = "string", ["description"] = "Optional notes." }
+                    },
+                    ["required"] = new JsonArray("criterion", "status")
                 })
-        };
+          };
 
         return new JsonObject { ["tools"] = tools };
     }
@@ -343,9 +371,99 @@ public class McpController : ControllerBase
                 return await _agentService.RescheduleInterviewAsync(key.Value, slot, cancellationToken);
             }
 
+            case "get_interview_ready_checklist":
+            {
+                var key = GetKey();
+                if (key is null) return "Invalid or missing continuity key.";
+                var lead = await _agentService.ResolveLeadAsync(key.Value, cancellationToken);
+                if (lead is null) return "Candidate not found.";
+
+                var qualification = await _qualificationService.GetOrCreateAsync(lead.Id, null, null, cancellationToken);
+                var lines = qualification.Checks
+                    .OrderBy(c => c.Criterion)
+                    .Select(c =>
+                        $"- {CandidateQualificationService.CriterionLabel(c.Criterion)} ({CriterionSlug(c.Criterion)}): " +
+                        $"{c.Prompt}" +
+                        (string.IsNullOrWhiteSpace(c.Expected) ? "" : $" Expected: {c.Expected}") +
+                        $" [status: {c.Status}]");
+                return "Interview-ready checklist:\n" + string.Join("\n", lines);
+            }
+
+            case "save_checklist_answer":
+            {
+                var key = GetKey();
+                if (key is null) return "Invalid or missing continuity key.";
+                var lead = await _agentService.ResolveLeadAsync(key.Value, cancellationToken);
+                if (lead is null) return "Candidate not found.";
+
+                var criterion = ParseCriterion(GetArg("criterion"));
+                if (criterion is null) return "Unknown criterion. Use a name from get_interview_ready_checklist.";
+
+                var status = ParseStatus(GetArg("status"));
+                var qualification = await _qualificationService.GetOrCreateAsync(lead.Id, null, null, cancellationToken);
+                var check = qualification.Checks.FirstOrDefault(c => c.Criterion == criterion.Value);
+                if (check is null) return "That check was not found for this candidate.";
+
+                await _qualificationService.UpdateCheckAsync(
+                    check.Id,
+                    status,
+                    GetArg("answer"),
+                    GetArg("notes"),
+                    CheckSource.Agent,
+                    cancellationToken);
+
+                return $"Saved {CandidateQualificationService.CriterionLabel(criterion.Value)} as {status}.";
+            }
+
             default:
                 return $"Unknown tool: {name}";
         }
+    }
+
+    private static string CriterionSlug(InterviewReadyCriterion criterion)
+    {
+        // RoleRelevance -> role_relevance
+        var name = criterion.ToString();
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < name.Length; i++)
+        {
+            if (char.IsUpper(name[i]) && i > 0)
+            {
+                sb.Append('_');
+            }
+            sb.Append(char.ToLowerInvariant(name[i]));
+        }
+        return sb.ToString();
+    }
+
+    private static InterviewReadyCriterion? ParseCriterion(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalised = new string(value.Where(char.IsLetter).ToArray()).ToLowerInvariant();
+        foreach (var criterion in Enum.GetValues<InterviewReadyCriterion>())
+        {
+            if (new string(criterion.ToString().Where(char.IsLetter).ToArray()).ToLowerInvariant() == normalised)
+            {
+                return criterion;
+            }
+        }
+        return null;
+    }
+
+    private static InterviewReadyStatus ParseStatus(string? value)
+    {
+        var normalised = (value ?? string.Empty).Trim().ToLowerInvariant().Replace("-", "_").Replace(" ", "_");
+        return normalised switch
+        {
+            "met" or "yes" or "true" => InterviewReadyStatus.Met,
+            "not_met" or "notmet" or "no" or "false" or "not_suitable" => InterviewReadyStatus.NotMet,
+            "not_applicable" or "notapplicable" or "n/a" or "na" => InterviewReadyStatus.NotApplicable,
+            _ => InterviewReadyStatus.Unknown
+        };
     }
 
     private static JsonObject Tool(string name, string description, JsonObject inputSchema)

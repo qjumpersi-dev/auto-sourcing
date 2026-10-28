@@ -14,6 +14,7 @@ using AutoSourcing.Services.LinkedIn;
 using AutoSourcing.Services.Microsoft;
 using AutoSourcing.Services.NLSearch;
 using AutoSourcing.Services.Outreach;
+using AutoSourcing.Services.Qualification;
 using AutoSourcing.Services.Rhetorik;
 using AutoSourcing.Services.Scotty;
 using AutoSourcing.Services.Sms;
@@ -79,6 +80,7 @@ builder.Services.AddHttpClient<ISmsService, TwilioSmsService>();
 builder.Services.AddSingleton<IJobService, JobService>();
 builder.Services.AddHttpClient<IContentGenerationService, ContentGenerationService>();
 builder.Services.AddScoped<ICandidateAgentService, CandidateAgentService>();
+builder.Services.AddScoped<ICandidateQualificationService, CandidateQualificationService>();
 
 builder.Services.AddSingleton<ICampaignRunQueue, CampaignRunQueue>();
 builder.Services.AddHostedService<CampaignRunBackgroundService>();

@@ -84,6 +84,62 @@ namespace AutoSourcing.Data.Migrations
                     b.ToTable("Campaigns");
                 });
 
+            modelBuilder.Entity("AutoSourcing.Core.Entities.CandidateQualification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Availability")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("CampaignId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ConfirmedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("HandoverSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("HandoverSentTo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("JobId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NoticePeriod")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PayExpectation")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeadId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CandidateQualifications");
+                });
+
             modelBuilder.Entity("AutoSourcing.Core.Entities.ChannelConsent", b =>
                 {
                     b.Property<int>("Id")
@@ -888,6 +944,60 @@ namespace AutoSourcing.Data.Migrations
                     b.ToTable("PolicyGuardrails");
                 });
 
+            modelBuilder.Entity("AutoSourcing.Core.Entities.QualificationCheck", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Answer")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CandidateQualificationId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ConfirmedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Criterion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Expected")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CandidateQualificationId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("QualificationChecks");
+                });
+
             modelBuilder.Entity("AutoSourcing.Core.Entities.Sequence", b =>
                 {
                     b.Property<int>("Id")
@@ -1106,6 +1216,17 @@ namespace AutoSourcing.Data.Migrations
                     b.Navigation("Sequence");
                 });
 
+            modelBuilder.Entity("AutoSourcing.Core.Entities.CandidateQualification", b =>
+                {
+                    b.HasOne("AutoSourcing.Core.Entities.Lead", "Lead")
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lead");
+                });
+
             modelBuilder.Entity("AutoSourcing.Core.Entities.ChannelConsent", b =>
                 {
                     b.HasOne("AutoSourcing.Core.Entities.Lead", "Lead")
@@ -1198,6 +1319,17 @@ namespace AutoSourcing.Data.Migrations
                     b.Navigation("Lead");
                 });
 
+            modelBuilder.Entity("AutoSourcing.Core.Entities.QualificationCheck", b =>
+                {
+                    b.HasOne("AutoSourcing.Core.Entities.CandidateQualification", "Qualification")
+                        .WithMany("Checks")
+                        .HasForeignKey("CandidateQualificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Qualification");
+                });
+
             modelBuilder.Entity("AutoSourcing.Core.Entities.SequenceStep", b =>
                 {
                     b.HasOne("AutoSourcing.Core.Entities.Sequence", "Sequence")
@@ -1223,6 +1355,11 @@ namespace AutoSourcing.Data.Migrations
             modelBuilder.Entity("AutoSourcing.Core.Entities.Campaign", b =>
                 {
                     b.Navigation("OutreachMessages");
+                });
+
+            modelBuilder.Entity("AutoSourcing.Core.Entities.CandidateQualification", b =>
+                {
+                    b.Navigation("Checks");
                 });
 
             modelBuilder.Entity("AutoSourcing.Core.Entities.Interview", b =>

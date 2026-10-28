@@ -13,6 +13,8 @@ import type {
   Client,
   ClientInput,
   LookupValue,
+  CandidateQualification,
+  QualificationCheck,
   EnrichedProfileSearchResponse,
   GeneratedContent,
   GenerateContentRequest,
@@ -71,7 +73,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Client', 'Lookup', 'Organization', 'Policy', 'User', 'Interview'],
+  tagTypes: ['Lead', 'Campaign', 'OutreachMessage', 'Sequence', 'Job', 'Client', 'Lookup', 'Qualification', 'Organization', 'Policy', 'User', 'Interview'],
   endpoints: (builder) => ({
     getAuthStatus: builder.query<AuthStatus, void>({
       query: () => '/auth/status',
@@ -380,6 +382,55 @@ export const apiSlice = createApi({
       query: (body) => ({ url: '/lookups', method: 'POST', body }),
       invalidatesTags: ['Lookup'],
     }),
+    getQualification: builder.query<
+      CandidateQualification,
+      { leadId: number; jobId?: number | null; campaignId?: number | null }
+    >({
+      query: ({ leadId, jobId, campaignId }) => {
+        const params = new URLSearchParams()
+        if (jobId != null) params.set('jobId', String(jobId))
+        if (campaignId != null) params.set('campaignId', String(campaignId))
+        const qs = params.toString()
+        return `/leads/${leadId}/qualification${qs ? `?${qs}` : ''}`
+      },
+      providesTags: (_result, _error, arg) => [{ type: 'Qualification', id: arg.leadId }],
+    }),
+    updateQualification: builder.mutation<
+      CandidateQualification,
+      { id: number; leadId: number; payExpectation?: string | null; availability?: string | null; noticePeriod?: string | null }
+    >({
+      query: ({ id, leadId: _leadId, ...body }) => ({ url: `/qualifications/${id}`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: 'Qualification', id: arg.leadId }],
+    }),
+    updateQualificationCheck: builder.mutation<
+      QualificationCheck,
+      { checkId: number; leadId: number; status: number; answer?: string | null; notes?: string | null; source?: number }
+    >({
+      query: ({ checkId, leadId: _leadId, ...body }) => ({
+        url: `/qualifications/checks/${checkId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: 'Qualification', id: arg.leadId }],
+    }),
+    confirmQualificationCheck: builder.mutation<QualificationCheck, { checkId: number; leadId: number }>({
+      query: ({ checkId }) => ({ url: `/qualifications/checks/${checkId}/confirm`, method: 'POST' }),
+      invalidatesTags: (_result, _error, arg) => [{ type: 'Qualification', id: arg.leadId }],
+    }),
+    getQualificationHandover: builder.query<{ html: string }, number>({
+      query: (id) => `/qualifications/${id}/handover`,
+    }),
+    markHandoverSent: builder.mutation<
+      { sentAt: string | null; to: string | null },
+      { id: number; leadId: number; to?: string | null }
+    >({
+      query: ({ id, leadId: _leadId, to }) => ({
+        url: `/qualifications/${id}/handover-sent`,
+        method: 'POST',
+        body: { to },
+      }),
+      invalidatesTags: (_result, _error, arg) => [{ type: 'Qualification', id: arg.leadId }],
+    }),
     getOrganization: builder.query<OrganizationProfile, void>({
       query: () => '/organization',
       providesTags: ['Organization'],
@@ -503,6 +554,12 @@ export const {
   useDeleteClientMutation,
   useGetLookupsQuery,
   useAddLookupMutation,
+  useGetQualificationQuery,
+  useUpdateQualificationMutation,
+  useUpdateQualificationCheckMutation,
+  useConfirmQualificationCheckMutation,
+  useLazyGetQualificationHandoverQuery,
+  useMarkHandoverSentMutation,
   useGetOrganizationQuery,
   useUpdateOrganizationMutation,
   useGetPolicyQuery,

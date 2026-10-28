@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Award, BookOpen, Briefcase, Building2, CalendarClock, FileText, Globe, GraduationCap, Lightbulb, Loader2, Pencil, Sparkles, Target, Trophy, Users, Wrench, X } from 'lucide-react'
+import { Award, BookOpen, Briefcase, Building2, CalendarClock, ClipboardCheck, FileText, Globe, GraduationCap, Lightbulb, Loader2, Pencil, Sparkles, Target, Trophy, Users, Wrench, X } from 'lucide-react'
 import { useGetLeadConsentQuery, useGetLeadNotesQuery, useGetLeadProfileQuery } from '@/services/apiSlice'
 import {
   consentChannelLabels,
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { LeadEditModal } from './LeadEditModal'
 import { InterviewPanel } from '@/features/interviews/InterviewPanel'
+import { InterviewReadyPanel } from './InterviewReadyPanel'
 import { formatDate, formatDateTime } from '@/lib/formatDate'
 
 interface RhetorikFallback {
@@ -383,6 +384,14 @@ export function LeadProfileModal({
             {/* Interviews */}
             <Section title="Interviews" icon={<CalendarClock className="h-4 w-4" />}>
               <InterviewPanel leadId={lead.id} campaignId={campaignId ?? lead.campaigns?.[0]?.id ?? null} />
+            </Section>
+
+            {/* Interview-ready checklist */}
+            <Section title="Interview-ready checklist" icon={<ClipboardCheck className="h-4 w-4" />}>
+              <InterviewReadyPanel
+                leadId={lead.id}
+                campaignId={campaignId ?? lead.campaigns?.[0]?.id ?? null}
+              />
             </Section>
 
             {/* Notes */}

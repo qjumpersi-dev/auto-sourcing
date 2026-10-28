@@ -531,6 +531,54 @@ export interface JobInput {
     createdAt: string
   }
 
+  export const InterviewReadyStatus = {
+    Unknown: 0,
+    Met: 1,
+    NotMet: 2,
+    NotApplicable: 3,
+  } as const
+
+  export const interviewReadyStatusLabels: Record<number, string> = {
+    [InterviewReadyStatus.Unknown]: 'Unknown',
+    [InterviewReadyStatus.Met]: 'Met',
+    [InterviewReadyStatus.NotMet]: 'Not met',
+    [InterviewReadyStatus.NotApplicable]: 'Not applicable',
+  }
+
+  export interface QualificationCheck {
+    id: number
+    candidateQualificationId: number
+    criterion: string
+    criterionLabel: string
+    prompt: string
+    expected: string | null
+    status: string
+    statusLabel: string
+    answer: string | null
+    notes: string | null
+    source: string
+    confirmedByUserId: number | null
+    confirmedAt: string | null
+    updatedAt: string
+  }
+
+  export interface CandidateQualification {
+    id: number
+    leadId: number
+    jobId: number | null
+    campaignId: number | null
+    payExpectation: string | null
+    availability: string | null
+    noticePeriod: string | null
+    confirmedByUserId: number | null
+    confirmedAt: string | null
+    handoverSentAt: string | null
+    handoverSentTo: string | null
+    agentComplete: boolean
+    interviewReady: boolean
+    checks: QualificationCheck[]
+  }
+
   export const PayPeriod = {
     NotSpecified: 0,
     Hour: 1,
