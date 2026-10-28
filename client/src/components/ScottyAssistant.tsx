@@ -1,8 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, Phone, PhoneOff, Send, X } from 'lucide-react'
 import { Room, RoomEvent } from 'livekit-client'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useScottyCallMutation, useScottyChatMutation } from '@/services/apiSlice'
-import { cn } from '@/lib/utils'
+
+const markdownClasses = [
+  '[&_a]:text-primary [&_a]:underline',
+  '[&_code]:rounded [&_code]:bg-background/70 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs',
+  '[&_h1]:mb-1 [&_h1]:text-sm [&_h1]:font-semibold',
+  '[&_h2]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold',
+  '[&_h3]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold',
+  '[&_h4]:mb-1 [&_h4]:text-sm [&_h4]:font-semibold',
+  '[&_li]:ml-4',
+  '[&_ol]:mb-2 [&_ol]:list-decimal',
+  '[&_p]:mb-2 [&_p:last-child]:mb-0',
+  '[&_pre]:mb-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-background/70 [&_pre]:p-2 [&_pre]:text-xs',
+  '[&_strong]:font-semibold',
+  '[&_table]:w-full [&_table]:border-collapse',
+  '[&_td]:border [&_td]:border-border [&_td]:px-1 [&_td]:py-0.5 [&_th]:border [&_th]:border-border [&_th]:px-1 [&_th]:py-0.5',
+  '[&_ul]:mb-2 [&_ul]:list-disc',
+].join(' ')
 
 type ChatMessage = { role: 'user' | 'agent'; text: string }
 type CallState = 'idle' | 'connecting' | 'connected'
@@ -145,19 +163,23 @@ function ScottyAssistant() {
                 Hello! I&apos;m here to help with AI Talent Sourcing. What can I do for you?
               </p>
             )}
-            {messages.map((message, i) => (
-              <div
-                key={i}
-                className={cn(
-                  'max-w-[80%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm',
-                  message.role === 'user'
-                    ? 'ml-auto bg-primary text-primary-foreground'
-                    : 'bg-muted',
-                )}
-              >
-                {message.text}
-              </div>
-            ))}
+            {messages.map((message, i) =>
+              message.role === 'user' ? (
+                <div
+                  key={i}
+                  className="ml-auto max-w-[80%] whitespace-pre-wrap rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"
+                >
+                  {message.text}
+                </div>
+              ) : (
+                <div
+                  key={i}
+                  className={`max-w-[80%] rounded-lg bg-muted px-3 py-2 text-sm ${markdownClasses}`}
+                >
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown>
+                </div>
+              ),
+            )}
             {sending && <p className="text-sm text-muted-foreground">Agent is typing...</p>}
           </div>
 

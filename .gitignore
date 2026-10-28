@@ -26,6 +26,7 @@ build/
 .env
 .env.local
 .env.*.local
+src/AutoSourcing.API/appsettings.Development.json
 
 # OS
 .DS_Store

@@ -1,8 +1,6 @@
 using AutoSourcing.Core.Entities;
 using AutoSourcing.Core.Enums;
 using AutoSourcing.Data;
-using AutoSourcing.Services.Email;
-using AutoSourcing.Services.LinkedIn;
 using AutoSourcing.Services.Outreach;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -24,19 +22,11 @@ public class OutreachMessagesController : ControllerBase
 {
     private readonly AutoSourcingDbContext _dbContext;
     private readonly IOutreachService _outreachService;
-    private readonly IEmailService _emailService;
-    private readonly ILinkedInService _linkedInService;
 
-    public OutreachMessagesController(
-        AutoSourcingDbContext dbContext,
-        IOutreachService outreachService,
-        IEmailService emailService,
-        ILinkedInService linkedInService)
+    public OutreachMessagesController(AutoSourcingDbContext dbContext, IOutreachService outreachService)
     {
         _dbContext = dbContext;
         _outreachService = outreachService;
-        _emailService = emailService;
-        _linkedInService = linkedInService;
     }
 
     [HttpGet]
@@ -46,7 +36,9 @@ public class OutreachMessagesController : ControllerBase
             .Where(m => m.CampaignId == campaignId)
             .Include(m => m.Lead)
             .AsNoTracking()
-            .OrderBy(m => m.CreatedAt)
+            .OrderBy(m => m.LeadId)
+            .ThenBy(m => m.StepOrder)
+            .ThenBy(m => m.CreatedAt)
             .Select(m => new
             {
                 m.Id,
@@ -57,23 +49,39 @@ public class OutreachMessagesController : ControllerBase
                 m.Body,
                 m.Status,
                 m.ErrorMessage,
+                m.StepOrder,
+                m.OpenedAt,
+                m.ClickedAt,
+                m.RepliedAt,
                 m.CreatedAt,
                 m.SentAt,
+                m.SentByUserId,
+                m.FromAddress,
+                m.FromName,
+                m.ReplyTo,
                 Lead = new
                 {
                     m.Lead.Id,
                     m.Lead.FirstName,
                     m.Lead.LastName,
                     m.Lead.Email,
+                    m.Lead.Phone,
                     m.Lead.Company,
                     m.Lead.JobTitle,
-                    m.Lead.Status
+                    m.Lead.Location,
+                    m.Lead.LinkedInUrl,
+                    m.Lead.Source,
+                    m.Lead.ExternalId,
+                    m.Lead.Status,
+                    m.Lead.PreferredChannel,
+                    m.Lead.Country,
+                    m.Lead.CreatedAt,
+                    m.Lead.UpdatedAt
                 }
             })
             .ToListAsync(cancellationToken);
 
         return Ok(messages);
-
     }
 
     [HttpPost("drafts")]
@@ -93,6 +101,7 @@ public class OutreachMessagesController : ControllerBase
                 message.Body,
                 message.Status,
                 message.ErrorMessage,
+                message.StepOrder,
                 message.CreatedAt,
                 message.SentAt
             });
@@ -108,6 +117,7 @@ public class OutreachMessagesController : ControllerBase
     {
         var message = await _dbContext.OutreachMessages
             .Include(m => m.Lead)
+                .ThenInclude(l => l.Emails)
             .FirstOrDefaultAsync(m => m.Id == messageId && m.CampaignId == campaignId, cancellationToken);
 
         if (message is null)
@@ -122,37 +132,16 @@ public class OutreachMessagesController : ControllerBase
 
         try
         {
-            switch (message.Channel)
+            var result = await _outreachService.SendMessageAsync(message, cancellationToken);
+            if (result.Deferred)
             {
-                case OutreachChannel.Email:
-                    await _emailService.SendAsync(message.Lead.Email, message.Subject ?? "(no subject)", message.Body, cancellationToken);
-                    break;
-
-                case OutreachChannel.LinkedIn:
-                    if (string.IsNullOrWhiteSpace(message.Lead.LinkedInUrl))
-                    {
-                        return BadRequest(new { error = "Lead has no LinkedIn URL." });
-                    }
-
-                    var result = await _linkedInService.SendInMailAsync(message.Lead.LinkedInUrl, message.Subject ?? string.Empty, message.Body, cancellationToken);
-                    if (!result.Sent)
-                    {
-                        return Ok(new { dryRun = true, message = result.Message });
-                    }
-                    break;
-
-                default:
-                    return BadRequest(new { error = "Sending via this channel is not yet supported." });
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                return Ok(new { queued = true, message = "Queued for the local LinkedIn worker." });
             }
 
-            message.Status = OutreachMessageStatus.Sent;
-            message.SentAt = DateTime.UtcNow;
-            message.ErrorMessage = null;
-
-            if (message.Lead.Status == LeadStatus.New)
+            if (!result.Sent)
             {
-                message.Lead.Status = LeadStatus.Contacted;
-                message.Lead.UpdatedAt = DateTime.UtcNow;
+                return Ok(new { dryRun = true, message = result.Message });
             }
         }
         catch (Exception ex)
@@ -161,6 +150,22 @@ public class OutreachMessagesController : ControllerBase
             message.ErrorMessage = ex.Message.Length > 2000 ? ex.Message[..2000] : ex.Message;
         }
 
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{messageId:int}/mark-replied")]
+    public async Task<IActionResult> MarkReplied(int campaignId, int messageId, CancellationToken cancellationToken)
+    {
+        var message = await _dbContext.OutreachMessages
+            .FirstOrDefaultAsync(m => m.Id == messageId && m.CampaignId == campaignId, cancellationToken);
+
+        if (message is null)
+        {
+            return NotFound();
+        }
+
+        message.RepliedAt ??= DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

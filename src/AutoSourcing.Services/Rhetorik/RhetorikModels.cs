@@ -6,9 +6,12 @@ public class ProfileSearchRequest
 {
     public List<string> ProfileIds { get; set; } = [];
     public List<string> Keywords { get; set; } = [];
+    public List<string> ExcludeKeywords { get; set; } = [];
     public List<string> JobTitles { get; set; } = [];
+    public List<string> ExcludeJobTitles { get; set; } = [];
     public string JobTitleScope { get; set; } = "any";
     public List<string> Companies { get; set; } = [];
+    public List<string> ExcludeCompanies { get; set; } = [];
     public string CompanyScope { get; set; } = "current";
     public List<string> Expertises { get; set; } = [];
     public string ExpertiseMode { get; set; } = "must_have_any";
@@ -20,6 +23,9 @@ public class ProfileSearchRequest
     public int PageSize { get; set; } = 100;
     public int MaxResults { get; set; } = 500;
 
+    // Which candidates to include: only those with an email, with an email or a phone, or everyone.
+    public string ContactFilter { get; set; } = ContactEmail;
+
     public const string MustHaveAny = "must_have_any";
     public const string MustHaveAll = "must_have_all";
     public const string MustNotHaveAny = "must_not_have_any";
@@ -27,29 +33,30 @@ public class ProfileSearchRequest
 
     public const string EmailTag = "Profile Has Email";
 
+    public const string ContactEmail = "email";
+    public const string ContactEmailOrPhone = "email_or_phone";
+    public const string ContactAny = "any";
+
     internal Dictionary<string, object> BuildParameters()
     {
         var parameters = new Dictionary<string, object>();
 
         AddIsOneOf(parameters, ProfileIds, "profile_id");
 
-        if (Keywords is { Count: > 0 })
-        {
-            parameters["keywords"] = new[] { new { @operator = "is one of", value = Keywords } };
-        }
+          AddIncludeExclude(parameters, Keywords, ExcludeKeywords, "keywords");
 
-        AddIsOneOf(parameters, JobTitles, JobTitleScope switch
-        {
-            "current" => "current_job_titles",
-            "past" => "previous_job_titles",
-            _ => "job_titles"
-        });
+          AddIncludeExclude(parameters, JobTitles, ExcludeJobTitles, JobTitleScope switch
+          {
+              "current" => "current_job_titles",
+              "past" => "previous_job_titles",
+              _ => "job_titles"
+          });
 
-        AddIsOneOf(parameters, Companies, CompanyScope switch
-        {
-            "past" => "previous_company_names",
-            _ => CompanyScope == "any" ? "company_names" : "current_company_names"
-        });
+          AddIncludeExclude(parameters, Companies, ExcludeCompanies, CompanyScope switch
+          {
+              "past" => "previous_company_names",
+              _ => CompanyScope == "any" ? "company_names" : "current_company_names"
+          });
 
         if (Expertises is { Count: > 0 })
         {
@@ -62,13 +69,37 @@ public class ProfileSearchRequest
             };
         }
 
-        AddIsOneOf(parameters, Countries, "countries");
-        AddIsOneOf(parameters, States, "states");
-        AddIsOneOf(parameters, Cities, "cities");
+          AddIsOneOf(parameters, Countries, "countries");
+          AddIsOneOf(parameters, States, "states");
+          AddIsOneOf(parameters, Cities, "cities");
 
-        parameters["profile_tags"] = new[] { new { @operator = "is one of", value = new[] { EmailTag } } };
+          if (string.IsNullOrEmpty(ContactFilter) || ContactFilter == ContactEmail)
+          {
+              parameters["profile_tags"] = new[] { new { @operator = "is one of", value = new[] { EmailTag } } };
+          }
 
-        return parameters;
+          return parameters;
+    }
+
+    private static void AddIncludeExclude(
+        Dictionary<string, object> parameters,
+        List<string>? include,
+        List<string>? exclude,
+        string field)
+    {
+        var filters = new List<object>();
+        if (include is { Count: > 0 })
+        {
+            filters.Add(new { @operator = "is one of", value = include });
+        }
+        if (exclude is { Count: > 0 })
+        {
+            filters.Add(new { @operator = "is not one of", value = exclude });
+        }
+        if (filters.Count > 0)
+        {
+            parameters[field] = filters.ToArray();
+        }
     }
 
     private static void AddIsOneOf(Dictionary<string, object> parameters, List<string>? values, string field)
@@ -132,6 +163,9 @@ public class RhetorikProfileResult
 
     [JsonPropertyName("contact_data")]
     public RhetorikContactDataBlock? ContactData { get; set; }
+
+    [JsonPropertyName("resume_data")]
+    public RhetorikResumeData? ResumeData { get; set; }
 }
 
 public class RhetorikProfileData
@@ -159,6 +193,75 @@ public class RhetorikProfileData
 
     [JsonPropertyName("profile_address")]
     public RhetorikAddress? Address { get; set; }
+
+    [JsonPropertyName("profile_educations")]
+    public IReadOnlyList<RhetorikEducation>? Educations { get; set; }
+
+    [JsonPropertyName("profile_certifications")]
+    public IReadOnlyList<string>? Certifications { get; set; }
+
+    [JsonPropertyName("profile_industries")]
+    public IReadOnlyList<string>? Industries { get; set; }
+
+    [JsonPropertyName("profile_languages")]
+    public IReadOnlyList<string>? Languages { get; set; }
+
+    [JsonPropertyName("profile_memberships")]
+    public IReadOnlyList<string>? Memberships { get; set; }
+
+    [JsonPropertyName("profile_publications")]
+    public IReadOnlyList<string>? Publications { get; set; }
+
+    [JsonPropertyName("profile_awards")]
+    public IReadOnlyList<string>? Awards { get; set; }
+
+    [JsonPropertyName("profile_patents")]
+    public IReadOnlyList<string>? Patents { get; set; }
+
+    [JsonPropertyName("profile_last_updated")]
+    public string? LastUpdated { get; set; }
+
+    [JsonPropertyName("profile_social_links")]
+    public IReadOnlyList<RhetorikSocialLink>? SocialLinks { get; set; }
+
+    [JsonPropertyName("profile_emails")]
+    public IReadOnlyList<RhetorikProfileEmail>? ProfileEmails { get; set; }
+}
+
+public class RhetorikSocialLink
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
+}
+
+public class RhetorikEducation
+{
+    [JsonPropertyName("educational_establishment")]
+    public string? EducationalEstablishment { get; set; }
+
+    [JsonPropertyName("diploma")]
+    public string? Diploma { get; set; }
+
+    [JsonPropertyName("specialization")]
+    public string? Specialization { get; set; }
+
+    [JsonPropertyName("start_date")]
+    public string? StartDate { get; set; }
+
+    [JsonPropertyName("end_date")]
+    public string? EndDate { get; set; }
+}
+
+public class RhetorikProfileEmail
+{
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    [JsonPropertyName("priority")]
+    public int? Priority { get; set; }
 }
 
 public class RhetorikAddress
@@ -177,6 +280,139 @@ public class RhetorikContactDataBlock
 {
     [JsonPropertyName("contact_current_experiences")]
     public IReadOnlyList<RhetorikExperience>? CurrentExperiences { get; set; }
+
+      [JsonPropertyName("contact_emails")]
+      public IReadOnlyList<RhetorikContactEmail>? ContactEmails { get; set; }
+
+      [JsonPropertyName("contact_phones")]
+      public IReadOnlyList<RhetorikContactPhone>? ContactPhones { get; set; }
+  }
+
+public class RhetorikResumeData
+{
+    [JsonPropertyName("experiences")]
+    public IReadOnlyList<RhetorikExperience>? Experiences { get; set; }
+
+    [JsonPropertyName("educations")]
+    public IReadOnlyList<RhetorikEducation>? Educations { get; set; }
+
+    [JsonPropertyName("certifications")]
+    public IReadOnlyList<RhetorikCertification>? Certifications { get; set; }
+
+    [JsonPropertyName("memberships")]
+    public IReadOnlyList<RhetorikMembership>? Memberships { get; set; }
+
+    [JsonPropertyName("publications")]
+    public IReadOnlyList<RhetorikPublication>? Publications { get; set; }
+
+    [JsonPropertyName("patents")]
+    public IReadOnlyList<RhetorikPatent>? Patents { get; set; }
+
+    [JsonPropertyName("awards")]
+    public IReadOnlyList<RhetorikAward>? Awards { get; set; }
+}
+
+public class RhetorikCertification
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("authority")]
+    public string? Authority { get; set; }
+
+    [JsonPropertyName("date")]
+    public string? Date { get; set; }
+
+    [JsonPropertyName("start_date")]
+    public string? StartDate { get; set; }
+
+    [JsonPropertyName("end_date")]
+    public string? EndDate { get; set; }
+}
+
+public class RhetorikMembership
+{
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("start_date")]
+    public string? StartDate { get; set; }
+
+    [JsonPropertyName("end_date")]
+    public string? EndDate { get; set; }
+}
+
+public class RhetorikPublication
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("date")]
+    public string? Date { get; set; }
+}
+
+public class RhetorikPatent
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("number")]
+    public string? Number { get; set; }
+
+    [JsonPropertyName("date")]
+    public string? Date { get; set; }
+}
+
+public class RhetorikAward
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("date")]
+    public string? Date { get; set; }
+}
+
+public record RhetorikContactEmailData(
+    IReadOnlyList<RhetorikContactEmail> ContactEmails,
+    IReadOnlyList<RhetorikProfileEmail> ProfileEmails);
+
+public class RhetorikContactEmail
+{
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
+    [JsonPropertyName("score")]
+    public double? Score { get; set; }
+
+    [JsonPropertyName("priority")]
+    public int? Priority { get; set; }
+
+    [JsonPropertyName("reason")]
+    public string? Reason { get; set; }
+
+    [JsonPropertyName("status_last_verification_date")]
+    public string? StatusLastVerificationDate { get; set; }
 }
 
 public class RhetorikExperience
@@ -186,12 +422,17 @@ public class RhetorikExperience
     [JsonPropertyName("raw_company_name")]
     public string? RawCompanyName { get; set; }
 
-
     [JsonPropertyName("job_title")]
     public string? JobTitle { get; set; }
 
     [JsonPropertyName("current")]
-    public bool Current { get; set; }
+    public bool? Current { get; set; }
+
+    [JsonPropertyName("start_date")]
+    public string? StartDate { get; set; }
+
+    [JsonPropertyName("end_date")]
+    public string? EndDate { get; set; }
 }
 
 public class AutocompleteResponse
@@ -207,6 +448,18 @@ public class AutocompleteSuggestion
 
     [JsonPropertyName("count")]
     public int? Count { get; set; }
+}
+
+public class RhetorikContactPhone
+{
+    [JsonPropertyName("phone")]
+    public string? Phone { get; set; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("priority")]
+    public int? Priority { get; set; }
 }
 
 

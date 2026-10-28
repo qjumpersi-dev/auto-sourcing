@@ -31,7 +31,8 @@ public class ScottyClient : IScottyClient
             continuity_key = request.ContinuityKey
         };
 
-        var uri = new Uri($"{_options.BaseUrl.TrimEnd('/')}/channels/rest/{_options.RestChannelId}");
+        var channelId = string.IsNullOrWhiteSpace(request.ChannelId) ? _options.RestChannelId : request.ChannelId;
+        var uri = new Uri($"{_options.BaseUrl.TrimEnd('/')}/channels/rest/{channelId}");
         using var response = await _httpClient.PostAsJsonAsync(uri, payload, JsonOptions, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -53,7 +54,8 @@ public class ScottyClient : IScottyClient
             continuity_key = request.ContinuityKey
         };
 
-        var uri = new Uri($"{_options.BaseUrl.TrimEnd('/')}/channels/webrtc/{_options.WebRtcChannelId}");
+        var channelId = string.IsNullOrWhiteSpace(request.ChannelId) ? _options.WebRtcChannelId : request.ChannelId;
+        var uri = new Uri($"{_options.BaseUrl.TrimEnd('/')}/channels/webrtc/{channelId}");
         using var response = await _httpClient.PostAsJsonAsync(uri, payload, JsonOptions, cancellationToken);
 
         if (!response.IsSuccessStatusCode)

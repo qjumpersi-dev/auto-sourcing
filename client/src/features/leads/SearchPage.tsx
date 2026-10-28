@@ -1,14 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { AlertCircle, Download, Loader2, MailPlus, Search, Sparkles } from 'lucide-react'
+import { AlertCircle, Briefcase, Download, Loader2, MailPlus, Map, RotateCcw, Search, Sparkles, Users } from 'lucide-react'
 import {
   useGetCampaignsQuery,
   useGenerateSearchSpecMutation,
-  useImportFromRhetorikMutation,
+  useGenerateJobSearchMutation,
+    useGetJobsQuery,
+    useGetLookupsQuery,
+    useImportFromRhetorikMutation,
   useImportToCampaignMutation,
   useSearchRhetorikMutation,
 } from '@/services/apiSlice'
-import type { ProfileSearchRequest, EnrichedProfileSearchResponse, Scope, ExpertiseMode } from '@/types/models'
+import type { ProfileSearchRequest, EnrichedProfileSearchResponse, Scope, ExpertiseMode, Lead } from '@/types/models'
 import { SuggestionInput } from '@/components/Combobox'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,20 +20,28 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { LeadProfileModal } from './LeadProfileModal'
+import { ValueChips } from '@/components/ValueChips'
+import { TagInput } from '@/components/TagInput'
+import { findCitiesWithinRadius } from './cityRadius'
+import { LocationMapPanel } from './LocationMapPanel'
 
 interface SearchFormValues {
-  freeText: string
-  keywords: string
-  jobTitles: string
-  jobTitleScope: Scope
-  companies: string
-  companyScope: Scope
-  expertises: string
-  expertiseMode: ExpertiseMode
-  country: string
-  states: string
-  cities: string
-}
+    freeText: string
+    keywords: string
+    excludeKeywords: string
+    jobTitles: string
+    excludeJobTitles: string
+    jobTitleScope: Scope
+    companies: string
+    excludeCompanies: string
+    companyScope: Scope
+    expertises: string
+    expertiseMode: ExpertiseMode
+    country: string
+    states: string
+    cities: string
+  }
 
 const expertiseModeLabels: Record<ExpertiseMode, string> = {
   must_have_any: 'Must have any',
@@ -58,29 +69,52 @@ function jobTitle(r: EnrichedProfileSearchResponse['results'][number]): string |
   return exp?.job_title ?? r.profile_data?.profile_headline ?? null
 }
 
-export function SearchPage() {
+function linkedInUrl(r: EnrichedProfileSearchResponse['results'][number]): string | null {
+  const link = r.profile_data?.profile_social_links?.find(
+    (l) =>
+      (l.name ?? '').toLowerCase().includes('linkedin') ||
+      (l.url ?? '').toLowerCase().includes('linkedin'),
+  )
+  const url = link?.url?.trim()
+  if (!url) return null
+  return url.startsWith('http') ? url : `https://${url.replace(/^\/+/, '')}`
+}
+
+export function SearchPage({ initialCriteria }: { initialCriteria?: ProfileSearchRequest }) {
   const [searchRhetorik, { isLoading: searching }] = useSearchRhetorikMutation()
   const [generateSpec] = useGenerateSearchSpecMutation()
   const [importFromRhetorik, { isLoading: importing }] = useImportFromRhetorikMutation()
   const [importToCampaign, { isLoading: addingToCampaign }] = useImportToCampaignMutation()
   const { data: campaigns = [] } = useGetCampaignsQuery()
+  const { data: jobs = [] } = useGetJobsQuery()
+  const [generateJobSearch, { isLoading: loadingJobSearch }] = useGenerateJobSearchMutation()
 
   const [results, setResults] = useState<EnrichedProfileSearchResponse | null>(null)
   const [lastRequest, setLastRequest] = useState<ProfileSearchRequest | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [selectedResultIds, setSelectedResultIds] = useState<Set<string>>(new Set())
   const [targetCampaign, setTargetCampaign] = useState('')
+  const [contactFilter, setContactFilter] = useState('email')
+  const [radiusMiles, setRadiusMiles] = useState(0)
+  const [radiusNotice, setRadiusNotice] = useState<string | null>(null)
   const [addFeedback, setAddFeedback] = useState<string | null>(null)
   const [jobTitleSuggestions, setJobTitleSuggestions] = useState<string[]>([])
+  const [profileLead, setProfileLead] = useState<Lead | null>(null)
+  const [rhetorikFallback, setRhetorikFallback] = useState<any>(null)
+  const [selectedJobId, setSelectedJobId] = useState('')
+  const [viewMode, setViewMode] = useState<'map' | 'candidates'>('map')
 
-  const { register, handleSubmit, getValues, setValue, formState: { errors } } = useForm<SearchFormValues>({
+  const { register, handleSubmit, getValues, setValue, reset, watch, formState: { errors } } = useForm<SearchFormValues>({
     defaultValues: {
-      freeText: '',
-      keywords: '',
-      jobTitles: '',
-      jobTitleScope: 'any',
-      companies: '',
-      companyScope: 'current',
+        freeText: '',
+        keywords: '',
+        excludeKeywords: '',
+        jobTitles: '',
+        excludeJobTitles: '',
+        jobTitleScope: 'any',
+        companies: '',
+        excludeCompanies: '',
+        companyScope: 'current',
       expertises: '',
       expertiseMode: 'must_have_any',
       country: '',
@@ -89,23 +123,144 @@ export function SearchPage() {
     },
   })
 
-  const buildRequest = (): ProfileSearchRequest => {
-    const v = getValues()
-    return {
-      keywords: toList(v.keywords),
-      jobTitles: toList(v.jobTitles),
-      jobTitleScope: v.jobTitleScope,
-      companies: toList(v.companies),
-      companyScope: v.companyScope,
-      expertises: toList(v.expertises),
-      expertiseMode: v.expertiseMode,
-      countries: (v.country ?? '').trim() ? [(v.country ?? '').trim()] : undefined,
-      states: toList(v.states),
-      cities: toList(v.cities),
-      pageNumber: 1,
-      pageSize: 100,
-      maxResults: 500,
+  const watched = watch()
+
+  const { data: jobTitleLookups = [] } = useGetLookupsQuery('job-title')
+  const { data: roleFamilyLookups = [] } = useGetLookupsQuery('role-family')
+
+  const canonicalTitles = (() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const item of [...jobTitleLookups, ...roleFamilyLookups]) {
+      const key = item.value.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      result.push(item.value)
     }
+    return result
+  })()
+
+  const titleNormalisations = (() => {
+    const values = toList(watched.jobTitles ?? '') ?? []
+    const suggestions: { from: string; to: string }[] = []
+    for (const value of values) {
+      const lower = value.toLowerCase()
+      if (canonicalTitles.some((canonical) => canonical.toLowerCase() === lower)) continue
+      const match = canonicalTitles
+        .filter((canonical) => canonical.length >= 4 && lower.includes(canonical.toLowerCase()))
+        .sort((a, b) => b.length - a.length)[0]
+      if (match) suggestions.push({ from: value, to: match })
+    }
+    return suggestions
+  })()
+
+  const applyNormalisation = (from: string, to: string) => {
+    const values = toList(watched.jobTitles ?? '') ?? []
+    const replaced = values.map((value) => (value.toLowerCase() === from.toLowerCase() ? to : value))
+    const seen = new Set<string>()
+    const deduped = replaced.filter((value) => {
+      const key = value.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    setValue('jobTitles', deduped.join(', '))
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    if (radiusMiles === 0) {
+      setRadiusNotice(null)
+      return
+    }
+
+    if (!(watched.cities ?? '').trim()) {
+      setRadiusNotice('Enter a city to use a radius.')
+      return
+    }
+
+    const run = async () => {
+      const radius = await findCitiesWithinRadius(
+        watched.cities ?? '',
+        watched.country ?? '',
+        watched.states ?? '',
+        radiusMiles,
+      )
+      if (cancelled) {
+        return
+      }
+      setRadiusNotice(radius?.note ?? 'Could not find that city to calculate a radius.')
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [radiusMiles, watched.cities, watched.country, watched.states])
+
+  useEffect(() => {
+    if (initialCriteria) {
+      if (initialCriteria.jobTitles?.length) {
+        setValue('jobTitles', initialCriteria.jobTitles.join(', '))
+      }
+      if (initialCriteria.keywords?.length) {
+        setValue('keywords', initialCriteria.keywords.join(', '))
+      }
+      if (initialCriteria.expertises?.length) {
+        setValue('expertises', initialCriteria.expertises.join(', '))
+      }
+      if (initialCriteria.expertiseMode) {
+        setValue('expertiseMode', initialCriteria.expertiseMode)
+      }
+      if (initialCriteria.countries?.length) {
+        setValue('country', initialCriteria.countries.join(', '))
+      }
+      if (initialCriteria.states?.length) {
+        setValue('states', initialCriteria.states.join(', '))
+      }
+      if (initialCriteria.cities?.length) {
+        setValue('cities', initialCriteria.cities.join(', '))
+      }
+    }
+  }, [initialCriteria, setValue])
+
+  const buildRequest = (extraCities: string[] = []): ProfileSearchRequest => {
+    const v = getValues()
+    const baseCities = toList(v.cities) ?? []
+    const mergedCities = (() => {
+      if (extraCities.length === 0) {
+        return baseCities.length > 0 ? baseCities : undefined
+      }
+      const seen = new Set<string>()
+      const merged: string[] = []
+      for (const city of [...baseCities, ...extraCities]) {
+        const key = city.toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        merged.push(city)
+      }
+      return merged
+    })()
+
+    return {
+        keywords: toList(v.keywords),
+        excludeKeywords: toList(v.excludeKeywords),
+        jobTitles: toList(v.jobTitles),
+        excludeJobTitles: toList(v.excludeJobTitles),
+        jobTitleScope: v.jobTitleScope,
+        companies: toList(v.companies),
+        excludeCompanies: toList(v.excludeCompanies),
+        companyScope: v.companyScope,
+        expertises: toList(v.expertises),
+        expertiseMode: v.expertiseMode,
+        countries: (v.country ?? '').trim() ? [(v.country ?? '').trim()] : undefined,
+        states: toList(v.states),
+        cities: mergedCities,
+        contactFilter,
+        pageNumber: 1,
+        pageSize: 100,
+        maxResults: 500,
+      }
   }
 
   const onAutoBuild = async () => {
@@ -129,6 +284,38 @@ export function SearchPage() {
     }
   }
 
+  const onReset = () => {
+    reset()
+    setResults(null)
+    setLastRequest(null)
+    setSearchError(null)
+    setSelectedResultIds(new Set())
+    setJobTitleSuggestions([])
+    setAddFeedback(null)
+    setSelectedJobId('')
+    setViewMode('map')
+    setRadiusMiles(0)
+    setRadiusNotice(null)
+  }
+
+  const onJobSelect = async (jobId: string) => {
+    setSelectedJobId(jobId)
+    if (!jobId) return
+    setSearchError(null)
+    try {
+      const spec = await generateJobSearch(Number(jobId)).unwrap()
+      setValue('jobTitles', (spec.jobTitles ?? []).join(', '))
+      setValue('keywords', (spec.keywords ?? []).join(', '))
+      setValue('expertises', (spec.expertises ?? []).join(', '))
+      if (spec.expertiseMode) setValue('expertiseMode', spec.expertiseMode)
+      setValue('country', (spec.countries ?? []).join(', '))
+      setValue('states', (spec.states ?? []).join(', '))
+      setValue('cities', (spec.cities ?? []).join(', '))
+    } catch {
+      setSearchError('Could not load the job search criteria.')
+    }
+  }
+
   const refreshResults = async () => {
     if (!lastRequest) return
     try {
@@ -144,15 +331,71 @@ export function SearchPage() {
     setAddFeedback(null)
     setResults(null)
     setSelectedResultIds(new Set())
-    try {
-      const request = buildRequest()
-      const response = await searchRhetorik(request).unwrap()
+      try {
+        let extraCities: string[] = []
+        if (radiusMiles > 0) {
+          const radius = await findCitiesWithinRadius(
+            getValues().cities ?? '',
+            getValues().country ?? '',
+            getValues().states ?? '',
+            radiusMiles,
+          )
+          extraCities = radius?.names ?? []
+          setRadiusNotice(radius?.note ?? 'Could not find that city to calculate a radius.')
+        } else {
+          setRadiusNotice(null)
+        }
+
+        const request = buildRequest(extraCities)
+        const response = await searchRhetorik(request).unwrap()
       setLastRequest(request)
       setResults(response)
+      setViewMode(request.cities?.length ? 'candidates' : 'map')
     } catch {
       setSearchError('The search failed. Try again or simplify the filters.')
     }
   })
+
+const drillCountry = (country: string) => {
+      setValue('country', country)
+      setValue('states', '')
+      setValue('cities', '')
+      onSearch()
+    }
+
+    const onContactFilterChange = async (value: string) => {
+      setContactFilter(value)
+      if (!lastRequest) return
+      setSearchError(null)
+      setAddFeedback(null)
+      setResults(null)
+      setSelectedResultIds(new Set())
+      try {
+        const request = { ...lastRequest, contactFilter: value }
+        const response = await searchRhetorik(request).unwrap()
+        setLastRequest(request)
+        setResults(response)
+        setViewMode(request.cities?.length ? 'candidates' : 'map')
+      } catch {
+        setSearchError('The search failed. Try again or simplify the filters.')
+      }
+    }
+
+  const drillState = (state: string) => {
+    const current = toList(getValues('states')) ?? []
+    if (!current.some((s) => s.toLowerCase() === state.toLowerCase())) {
+      setValue('states', [...current, state].join(', '))
+    }
+    onSearch()
+  }
+
+  const drillCity = (city: string) => {
+    const current = toList(getValues('cities')) ?? []
+    if (!current.some((c) => c.toLowerCase() === city.toLowerCase())) {
+      setValue('cities', [...current, city].join(', '))
+    }
+    onSearch()
+  }
 
   const toggleResult = (profileId: string) => {
     setSelectedResultIds((prev) => {
@@ -220,7 +463,7 @@ export function SearchPage() {
       setSelectedResultIds(new Set())
       await refreshResults()
     } catch {
-      setAddFeedback('Could not add candidates to the campaign. Does the campaign have templates set?')
+      setAddFeedback('Could not add candidates to the campaign. Does the campaign have a sequence set?')
     }
   }
 
@@ -238,8 +481,9 @@ export function SearchPage() {
       <CardHeader>
         <CardTitle>Find candidates</CardTitle>
         <CardDescription>
-          Searches candidate profiles. Every search automatically includes the "Profile Has Email"
-          tag. Up to 500 profiles are shown per search.
+          Searches candidate profiles. Use <strong>Show candidates</strong> to choose whether the
+          results must have an email address, an email or a phone number, or no contact requirement.
+          Up to 500 profiles are shown per search.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -258,15 +502,70 @@ export function SearchPage() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="jobSelect" className="flex items-center gap-1.5">
+              <Briefcase className="h-3.5 w-3.5" />
+              Autofill from a job
+            </Label>
+            <Select
+              id="jobSelect"
+              className="w-80"
+              value={selectedJobId}
+              onChange={(e) => onJobSelect(e.target.value)}
+              disabled={loadingJobSearch}
+            >
+              <option value="">Choose a job...</option>
+              {jobs.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.title}
+                  {job.location ? ` — ${job.location}` : ''}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {loadingJobSearch && <Loader2 className="mb-2 h-4 w-4 animate-spin text-muted-foreground" />}
+          <span className="mb-2 text-xs text-muted-foreground">
+            Loads the job's criteria into the fields below — review and edit before searching.
+          </span>
+        </div>
+
         <form onSubmit={onSearch} className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="keywords">Keywords</Label>
             <Input id="keywords" placeholder="recruiter, talent" {...register('keywords')} />
+            <ValueChips value={watched.keywords ?? ''} />
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="jobTitles">Job titles</Label>
-            <Input id="jobTitles" placeholder="Developer" {...register('jobTitles')} />
+            <TagInput
+              value={watched.jobTitles ?? ''}
+              onChange={(value) => setValue('jobTitles', value)}
+              placeholder="Type a job title, then Enter"
+            />
+            <p className="text-xs text-muted-foreground">
+              Add several job titles — the search matches any of them. Click × to remove one.
+            </p>
+            {titleNormalisations.length > 0 && (
+              <div className="space-y-1 rounded-md border bg-muted/30 p-2">
+                <p className="text-xs font-medium">Standardise for better matching</p>
+                {titleNormalisations.map(({ from, to }) => (
+                  <div key={from} className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="text-muted-foreground">{from} →</span>
+                    <span className="rounded-full border bg-background px-2 py-0.5">{to}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => applyNormalisation(from, to)}
+                    >
+                      Use
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
             {errors.jobTitles && (
               <p className="text-xs text-destructive">{errors.jobTitles.message}</p>
             )}
@@ -294,10 +593,53 @@ export function SearchPage() {
               <option value="past">Past</option>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="contactFilter">Show candidates</Label>
+            <Select
+              id="contactFilter"
+              value={contactFilter}
+              onChange={(e) => onContactFilterChange(e.target.value)}
+            >
+              <option value="email">With an email address</option>
+              <option value="email_or_phone">With an email or phone number</option>
+              <option value="any">All candidates</option>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Changing this re-runs the search with the same criteria.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 md:col-span-3">
+            <div className="rounded-md border bg-muted/30 p-3">
+              <p className="text-sm font-medium">Exclude (must not have)</p>
+              <p className="text-xs text-muted-foreground">
+                Candidates matching any of these are removed from the results.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="excludeKeywords">Exclude keywords</Label>
+            <Input id="excludeKeywords" placeholder="e.g. internship" {...register('excludeKeywords')} />
+            <ValueChips value={watched.excludeKeywords ?? ''} verb="Excludes" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="excludeJobTitles">Exclude job titles</Label>
+            <Input id="excludeJobTitles" placeholder="e.g. Sales Manager" {...register('excludeJobTitles')} />
+            <ValueChips value={watched.excludeJobTitles ?? ''} verb="Excludes" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="excludeCompanies">Exclude companies</Label>
+            <Input id="excludeCompanies" placeholder="e.g. Google" {...register('excludeCompanies')} />
+            <ValueChips value={watched.excludeCompanies ?? ''} verb="Excludes" />
+            <p className="text-xs text-muted-foreground">
+              Uses the company scope above (current / past / any).
+            </p>
+          </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="companies">Companies</Label>
             <Input id="companies" placeholder="Acme Corp" {...register('companies')} />
+            <ValueChips value={watched.companies ?? ''} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="companyScope">Company scope</Label>
@@ -349,6 +691,19 @@ export function SearchPage() {
               onChange={(v) => setValue('cities', v)}
               placeholder="Start typing a city..."
             />
+            <Label htmlFor="radius" className="pt-1 text-xs text-muted-foreground">
+              Include nearby towns
+            </Label>
+            <Select
+              id="radius"
+              value={String(radiusMiles)}
+              onChange={(e) => setRadiusMiles(Number(e.target.value))}
+            >
+              <option value="0">This city only</option>
+              <option value="30">Within 30 miles</option>
+              <option value="50">Within 50 miles</option>
+            </Select>
+            {radiusNotice && <p className="text-xs text-muted-foreground">{radiusNotice}</p>}
           </div>
 
           <div className="flex items-center gap-3 md:col-span-3">
@@ -356,7 +711,17 @@ export function SearchPage() {
               {searching ? <Loader2 className="animate-spin" /> : <Search />}
               Search profiles
             </Button>
-            <Badge variant="secondary">Must have email: always on</Badge>
+            <Button type="button" variant="outline" onClick={onReset} disabled={searching}>
+              <RotateCcw />
+              Reset
+            </Button>
+            <Badge variant={contactFilter === 'any' ? 'outline' : 'secondary'}>
+              {contactFilter === 'email_or_phone'
+                ? 'Must have email or phone'
+                : contactFilter === 'any'
+                  ? 'No contact requirement'
+                  : 'Must have email'}
+            </Badge>
           </div>
         </form>
 
@@ -367,7 +732,7 @@ export function SearchPage() {
           </div>
         )}
 
-        {results && (
+        {results && lastRequest && (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-medium">
@@ -376,6 +741,17 @@ export function SearchPage() {
                 500 shown)
               </p>
               <div className="flex flex-wrap items-center gap-2">
+                {viewMode === 'map' ? (
+                  <Button size="sm" variant="outline" onClick={() => setViewMode('candidates')}>
+                    <Users />
+                    Show candidates
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setViewMode('map')}>
+                    <Map />
+                    Show map
+                  </Button>
+                )}
                 <Select
                   className="h-8 w-48 text-xs"
                   value={targetCampaign}
@@ -399,6 +775,16 @@ export function SearchPage() {
               </div>
             </div>
 
+            {viewMode === 'map' ? (
+              <LocationMapPanel
+                searchRequest={lastRequest}
+                results={results}
+                onDrillCountry={drillCountry}
+                onDrillState={drillState}
+                onDrillCity={drillCity}
+              />
+            ) : (
+              <>
             {addFeedback && (
               <p className="text-xs text-muted-foreground">{addFeedback}</p>
             )}
@@ -459,7 +845,66 @@ export function SearchPage() {
                         />
                       </TableCell>
                       <TableCell className="font-medium">
-                        {r.profile_data ? `${r.profile_data.profile_first_name} ${r.profile_data.profile_last_name}` : '-'}
+                        {r.profile_data ? (
+                          <button
+                            type="button"
+                            className="text-blue-600 hover:underline"
+                            onClick={() => {
+                              const pd = r.profile_data!
+                              const rd = r.resume_data
+                              const exp = rd?.experiences ?? []
+                              setProfileLead({
+                                id: r.lead_id ?? 0,
+                                firstName: pd.profile_first_name,
+                                lastName: pd.profile_last_name,
+                                email: '',
+                                phone: null,
+                                company: companyName(r),
+                                jobTitle: jobTitle(r),
+                                location: [pd.profile_address?.city, pd.profile_address?.country].filter(Boolean).join(', ') || null,
+                                linkedInUrl: linkedInUrl(r),
+                                source: '',
+                                externalId: null,
+                                status: 0,
+                                preferredChannel: null,
+                                country: pd.profile_address?.country ?? null,
+                                createdAt: '',
+                                updatedAt: null,
+                                campaigns: r.campaigns ?? null,
+                              })
+                              setRhetorikFallback({
+                                headline: pd.profile_headline,
+                                summary: pd.profile_summary,
+                                selfReportedSkills: pd.profile_expertises,
+                                workExperience: exp.map((e: any) => ({
+                                  company: e.raw_company_name ?? e.company_name,
+                                  title: e.job_title,
+                                  current: e.current,
+                                  startDate: e.start_date,
+                                  endDate: e.end_date,
+                                })),
+                                education: (rd?.educations ?? []).map((e: any) => ({
+                                  school: e.educational_establishment,
+                                  degree: e.diploma,
+                                  specialization: e.specialization,
+                                  startDate: e.start_date,
+                                  endDate: e.end_date,
+                                })),
+                                certifications: (rd?.certifications ?? []).map((c: any) => c.name).filter(Boolean),
+                                industries: pd.profile_tags?.filter((t: string) => t.toLowerCase().includes('industry')) ?? [],
+                                languages: pd.profile_languages ?? [],
+                                memberships: (rd?.memberships ?? []).map((m: any) => m.name ?? m.title).filter(Boolean),
+                                publications: (rd?.publications ?? []).map((p: any) => p.name).filter(Boolean),
+                                awards: (rd?.awards ?? []).map((a: any) => a.name).filter(Boolean),
+                                patents: (rd?.patents ?? []).map((p: any) => p.name).filter(Boolean),
+                              })
+                            }}
+                          >
+                            {r.profile_data.profile_first_name} {r.profile_data.profile_last_name}
+                          </button>
+                        ) : (
+                          '-'
+                        )}
                       </TableCell>
                       <TableCell>{c ?? '-'}</TableCell>
                       <TableCell>{jobTitle(r) ?? '-'}</TableCell>
@@ -485,9 +930,14 @@ export function SearchPage() {
                 })}
               </TableBody>
             </Table>
+              </>
+            )}
           </div>
         )}
       </CardContent>
+      {profileLead && (
+        <LeadProfileModal lead={profileLead} rhetorikData={rhetorikFallback} onClose={() => { setProfileLead(null); setRhetorikFallback(null) }} />
+      )}
     </Card>
   )
 }

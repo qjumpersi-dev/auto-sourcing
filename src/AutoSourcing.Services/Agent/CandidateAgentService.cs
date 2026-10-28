@@ -1,0 +1,432 @@
+using AutoSourcing.Core.Entities;
+using AutoSourcing.Data;
+using AutoSourcing.Services.Email;
+using AutoSourcing.Core.Enums;
+using AutoSourcing.Services.Interviews;
+using Microsoft.EntityFrameworkCore;
+
+namespace AutoSourcing.Services.Agent;
+
+public record CandidateContext(
+    string CandidateName,
+    string? Email,
+    string? Phone,
+    string? Company,
+    string? JobTitle,
+    string? Location,
+    string? Country,
+    string OrgName,
+    string? About,
+    string? Evp,
+    string? Culture,
+    string? HiringProcess,
+    string? WhatAiMayAnswer,
+    string? EscalationTriggers,
+    string? RefusalTopics,
+    string? RequiredDisclaimers,
+    string? MarketRules,
+    string? NeedsHumanStates
+);
+
+public interface ICandidateAgentService
+{
+    Task<Lead?> ResolveLeadAsync(Guid conversationKey, CancellationToken cancellationToken = default);
+    Task<CandidateContext?> GetContextAsync(Guid conversationKey, CancellationToken cancellationToken = default);
+    Task<string> GetCompanyInfoAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default);
+    Task<string> GetGuardrailsAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default);
+    Task<string> GetRoleDetailsAsync(Guid conversationKey, CancellationToken cancellationToken = default);
+    Task<string> GetInterviewAsync(Guid conversationKey, CancellationToken cancellationToken = default);
+    Task<string> GetInterviewSlotsAsync(Guid conversationKey, CancellationToken cancellationToken = default);
+    Task<string> BookInterviewAsync(Guid conversationKey, int slotNumber, CancellationToken cancellationToken = default);
+    Task<string> RescheduleInterviewAsync(Guid conversationKey, int slotNumber, CancellationToken cancellationToken = default);
+    Task SaveMessageAsync(int leadId, string role, string content, bool isEscalation = false, CancellationToken cancellationToken = default);
+    Task<bool> EscalateAsync(Guid conversationKey, string reason, CancellationToken cancellationToken = default);
+}
+
+public class CandidateAgentService : ICandidateAgentService
+{
+    private readonly AutoSourcingDbContext _dbContext;
+    private readonly IEmailService _emailService;
+    private readonly IInterviewService _interviewService;
+
+    public CandidateAgentService(AutoSourcingDbContext dbContext, IEmailService emailService, IInterviewService interviewService)
+    {
+        _dbContext = dbContext;
+        _emailService = emailService;
+        _interviewService = interviewService;
+    }
+
+    public async Task<Lead?> ResolveLeadAsync(Guid conversationKey, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Leads
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.ConversationKey == conversationKey, cancellationToken);
+    }
+
+    public async Task<CandidateContext?> GetContextAsync(Guid conversationKey, CancellationToken cancellationToken = default)
+    {
+        var lead = await _dbContext.Leads
+            .Include(l => l.Profile)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.ConversationKey == conversationKey, cancellationToken);
+
+        if (lead is null)
+        {
+            return null;
+        }
+
+        // The agent is public (no signed-in user), so resolve the company data from the lead's owner.
+        var org = await _dbContext.OrganizationProfiles.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(o => o.UserId == lead.UserId, cancellationToken);
+        var policy = await _dbContext.PolicyGuardrails.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == lead.UserId, cancellationToken);
+
+        return new CandidateContext(
+            $"{lead.FirstName} {lead.LastName}".Trim(),
+            lead.Email,
+            lead.Phone,
+            lead.Company,
+            lead.JobTitle,
+            lead.Location,
+            lead.Country,
+            org?.OrgName ?? "the company",
+            StripHtml(org?.About),
+            StripHtml(org?.EVP),
+            StripHtml(org?.Culture),
+            StripHtml(org?.HiringProcess),
+            StripHtml(policy?.WhatAiMayAnswer),
+            StripHtml(policy?.EscalationTriggers),
+            StripHtml(policy?.RefusalTopics),
+            StripHtml(policy?.RequiredDisclaimers),
+            StripHtml(policy?.MarketRules),
+            StripHtml(policy?.NeedsHumanStates)
+        );
+    }
+
+    public async Task<string> GetCompanyInfoAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default)
+    {
+        var org = await ResolveOrgAsync(conversationKey, cancellationToken);
+        return $"""
+            Company: {org?.OrgName ?? "—"}
+            About: {StripHtml(org?.About) ?? "—"}
+            EVP / why join: {StripHtml(org?.EVP) ?? "—"}
+            Culture and benefits: {StripHtml(org?.Culture) ?? "—"}
+            Hiring process: {StripHtml(org?.HiringProcess) ?? "—"}
+            """;
+    }
+
+    public async Task<string> GetGuardrailsAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default)
+    {
+        var policy = await ResolvePolicyAsync(conversationKey, cancellationToken);
+        return $"""
+            What you may answer: {StripHtml(policy?.WhatAiMayAnswer) ?? "—"}
+            Escalate to a recruiter when: {StripHtml(policy?.EscalationTriggers) ?? "—"}
+            Topics to avoid: {StripHtml(policy?.RefusalTopics) ?? "—"}
+            Required disclaimers: {StripHtml(policy?.RequiredDisclaimers) ?? "—"}
+            Market / geography rules: {StripHtml(policy?.MarketRules) ?? "—"}
+            Needs human when: {StripHtml(policy?.NeedsHumanStates) ?? "—"}
+            """;
+    }
+
+    // Company data belongs to the user who owns the candidate's campaign.
+    private async Task<int?> ResolveOwnerUserIdAsync(Guid? conversationKey, CancellationToken cancellationToken)
+    {
+        if (conversationKey is not { } key)
+        {
+            return null;
+        }
+
+        return await _dbContext.Leads
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(l => l.ConversationKey == key)
+            .Select(l => (int?)l.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<OrganizationProfile?> ResolveOrgAsync(Guid? conversationKey, CancellationToken cancellationToken)
+    {
+        if (await ResolveOwnerUserIdAsync(conversationKey, cancellationToken) is { } ownerUserId)
+        {
+            return await _dbContext.OrganizationProfiles.IgnoreQueryFilters().AsNoTracking()
+                .FirstOrDefaultAsync(o => o.UserId == ownerUserId, cancellationToken);
+        }
+
+        return await _dbContext.OrganizationProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<PolicyGuardrails?> ResolvePolicyAsync(Guid? conversationKey, CancellationToken cancellationToken)
+    {
+        if (await ResolveOwnerUserIdAsync(conversationKey, cancellationToken) is { } ownerUserId)
+        {
+            return await _dbContext.PolicyGuardrails.IgnoreQueryFilters().AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserId == ownerUserId, cancellationToken);
+        }
+
+        return await _dbContext.PolicyGuardrails.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<string> GetInterviewAsync(Guid conversationKey, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Where(i => i.LeadId == lead.Id && i.Status != InterviewStatus.Cancelled)
+            .OrderByDescending(i => i.StartAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (interview is null)
+        {
+            return "No interview is booked for this candidate yet.";
+        }
+
+        var join = string.IsNullOrWhiteSpace(interview.TeamsJoinUrl) ? string.Empty : $" Join link: {interview.TeamsJoinUrl}";
+        return $"Interview status: {interview.Status}. Time: {interview.StartAt:dddd d MMMM yyyy HH:mm} UTC ({interview.DurationMinutes} minutes).{join}";
+    }
+
+    public async Task<string> GetRoleDetailsAsync(Guid conversationKey, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        // The role the candidate is being considered for comes from their interview's linked job,
+        // falling back to the role set on the campaign they are in.
+        var jobId = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Where(i => i.LeadId == lead.Id && i.JobId != null && i.Status != InterviewStatus.Cancelled)
+            .OrderByDescending(i => i.StartAt)
+            .Select(i => i.JobId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (jobId is null)
+        {
+            var campaignId = await _dbContext.OutreachMessages
+                .IgnoreQueryFilters()
+                .Where(m => m.LeadId == lead.Id)
+                .OrderByDescending(m => m.CreatedAt)
+                .Select(m => (int?)m.CampaignId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (campaignId is int cid)
+            {
+                jobId = await _dbContext.Campaigns
+                    .IgnoreQueryFilters()
+                    .Where(c => c.Id == cid)
+                    .Select(c => c.JobId)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+        }
+
+        if (jobId is null)
+        {
+            return "No specific role is linked to this candidate yet.";
+        }
+
+        var job = await _dbContext.Jobs
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(j => j.Id == jobId.Value, cancellationToken);
+
+        if (job is null)
+        {
+            return "Role details not found.";
+        }
+
+        var salary = job.SalaryType == SalaryType.NotDisclosed || (job.SalaryFrom is null && job.SalaryTo is null)
+            ? "Not disclosed"
+            : (job.SalaryFrom, job.SalaryTo) switch
+            {
+                ({ } from, null) => $"From {from:N0}",
+                (null, { } to) => $"Up to {to:N0}",
+                ({ } from, { } to) => $"{from:N0} – {to:N0}"
+            };
+
+        return $"""
+            Role: {job.Title}
+            Location: {job.Location ?? "—"}
+            Department: {job.Department ?? "—"}
+            Type: {job.Type} · {job.Flexibility}
+            Salary: {salary}
+            Hiring manager: {job.HiringManager ?? "—"}
+            Must-haves: {StripHtml(job.MustHaves) ?? "—"}
+            Nice-to-haves: {StripHtml(job.NiceToHaves) ?? "—"}
+            Skills: {StripHtml(job.Skills) ?? "—"}
+            Education: {StripHtml(job.Education) ?? "—"}
+            Why join: {StripHtml(job.AttractiveReasons) ?? "—"}
+            About the role: {StripHtml(job.AdvertCopy) ?? "—"}
+            """;
+    }
+
+    public async Task<string> GetInterviewSlotsAsync(Guid conversationKey, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        var slots = await _interviewService.GetAvailableSlotsAsync(lead.Id, cancellationToken);
+        if (slots.Count == 0)
+        {
+            return "No interview times are currently available. Tell the candidate a recruiter will be in touch to arrange a time.";
+        }
+
+        var lines = slots.Select((slot, index) => $"{index + 1}. {slot.Label}");
+        return "Available interview times:\n" + string.Join("\n", lines) +
+               "\nOffer these exact options, ask which suits the candidate, then call book_interview with the number they choose.";
+    }
+
+    public async Task<string> BookInterviewAsync(Guid conversationKey, int slotNumber, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        var slots = await _interviewService.GetAvailableSlotsAsync(lead.Id, cancellationToken);
+        if (slotNumber < 1 || slotNumber > slots.Count)
+        {
+            return $"That option is not available. Call get_interview_slots and offer one of the {slots.Count} times.";
+        }
+
+        try
+        {
+            var campaignId = await ResolveCampaignIdAsync(lead.Id, cancellationToken);
+            var interview = await _interviewService.BookAsync(lead.Id, campaignId, null, slots[slotNumber - 1].StartUtc, [], cancellationToken);
+            return $"Interview booked for {interview.StartAt:dddd d MMMM yyyy HH:mm} UTC. A Teams invitation has been emailed to the candidate. Confirm the time with them.";
+        }
+        catch (Exception ex)
+        {
+            return $"Could not book the interview: {ex.Message}";
+        }
+    }
+
+    public async Task<string> RescheduleInterviewAsync(Guid conversationKey, int slotNumber, CancellationToken cancellationToken = default)
+    {
+        var lead = await ResolveLeadAsync(conversationKey, cancellationToken);
+        if (lead is null)
+        {
+            return "Candidate not found.";
+        }
+
+        var existing = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Where(i => i.LeadId == lead.Id && i.Status == InterviewStatus.Booked)
+            .OrderByDescending(i => i.StartAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existing is null)
+        {
+            return "There is no booked interview to move. Call get_interview_slots to arrange one.";
+        }
+
+        var slots = await _interviewService.GetAvailableSlotsAsync(lead.Id, cancellationToken);
+        if (slotNumber < 1 || slotNumber > slots.Count)
+        {
+            return $"That option is not available. Offer one of the {slots.Count} times.";
+        }
+
+        try
+        {
+            var interview = await _interviewService.RescheduleAsync(existing.Id, slots[slotNumber - 1].StartUtc, cancellationToken);
+            return $"Interview moved to {interview.StartAt:dddd d MMMM yyyy HH:mm} UTC. The updated Teams invitation has been sent.";
+        }
+        catch (Exception ex)
+        {
+            return $"Could not reschedule the interview: {ex.Message}";
+        }
+    }
+
+    private async Task<int?> ResolveCampaignIdAsync(int leadId, CancellationToken cancellationToken) =>
+        await _dbContext.OutreachMessages
+            .IgnoreQueryFilters()
+            .Where(m => m.LeadId == leadId)
+            .OrderByDescending(m => m.CreatedAt)
+            .Select(m => (int?)m.CampaignId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task SaveMessageAsync(int leadId, string role, string content, bool isEscalation = false, CancellationToken cancellationToken = default)
+    {
+        // Candidate conversations arrive without a signed-in user, so inherit the lead's owner.
+        var ownerId = await _dbContext.Leads
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(l => l.Id == leadId)
+            .Select(l => (int?)l.UserId)
+            .FirstOrDefaultAsync(cancellationToken) ?? 0;
+
+        _dbContext.ConversationMessages.Add(new ConversationMessage
+        {
+            UserId = ownerId,
+            LeadId = leadId,
+            Role = role,
+            Content = content,
+            IsEscalation = isEscalation,
+            CreatedAt = DateTime.UtcNow
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> EscalateAsync(Guid conversationKey, string reason, CancellationToken cancellationToken = default)
+    {
+        var lead = await _dbContext.Leads
+            .FirstOrDefaultAsync(l => l.ConversationKey == conversationKey, cancellationToken);
+
+        if (lead is null)
+        {
+            return false;
+        }
+
+        _dbContext.ConversationMessages.Add(new ConversationMessage
+        {
+            UserId = lead.UserId,
+            LeadId = lead.Id,
+            Role = "system",
+            Content = $"Escalated to recruiter: {reason}",
+            IsEscalation = true,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        lead.UpdatedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var org = await _dbContext.OrganizationProfiles.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(o => o.UserId == lead.UserId, cancellationToken);
+        var to = org?.EscalationEmail;
+        if (!string.IsNullOrWhiteSpace(to))
+        {
+            try
+            {
+                var subject = $"Candidate escalation: {lead.FirstName} {lead.LastName}";
+                var body = $"""
+                    <p>A candidate conversation has been escalated to a recruiter.</p>
+                    <p><strong>Candidate:</strong> {lead.FirstName} {lead.LastName} ({lead.Email})</p>
+                    <p><strong>Reason:</strong> {reason}</p>
+                    <p><strong>Current role:</strong> {lead.JobTitle ?? "—"} at {lead.Company ?? "—"}</p>
+                    """;
+                await _emailService.SendAsync(new[] { to }, subject, body, cancellationToken: cancellationToken);
+            }
+            catch
+            {
+                // Escalation is recorded even if the email fails.
+            }
+        }
+
+        return true;
+    }
+
+    private static string? StripHtml(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return null;
+        return System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", " ").Trim();
+    }
+}

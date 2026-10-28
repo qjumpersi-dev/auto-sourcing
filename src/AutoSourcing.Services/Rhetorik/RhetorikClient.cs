@@ -10,23 +10,95 @@ public class RhetorikClient : IRhetorikClient
     private const string ProfileSearchEndpoint = "profile/search";
     private const string AutocompleteEndpoint = "autocomplete";
 
-    private const bool RevealAllData = false;
     private const int MaxPageSize = 100;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _httpClient;
+    private readonly RhetorikOptions _options;
 
     public RhetorikClient(HttpClient httpClient, IOptions<RhetorikOptions> options)
     {
         _httpClient = httpClient;
-        var opts = options.Value;
-        _httpClient.BaseAddress ??= new Uri(opts.BaseUrl);
+        _options = options.Value;
+        _httpClient.BaseAddress ??= new Uri(_options.BaseUrl);
         _httpClient.DefaultRequestHeaders.Remove("X-Api-Key");
-        _httpClient.DefaultRequestHeaders.Add("X-Api-Key", opts.ApiKey);
+        _httpClient.DefaultRequestHeaders.Add("X-Api-Key", _options.ApiKey);
     }
 
     public async Task<ProfileSearchResponse> SearchProfilesAsync(ProfileSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await SearchAllPagesAsync(request, revealAllData: false, cancellationToken);
+
+        // "Email or phone" has no server-side Rhetorik tag, so it is applied to the results here.
+        if (request.ContactFilter == ProfileSearchRequest.ContactEmailOrPhone)
+        {
+            response = new ProfileSearchResponse
+            {
+                Counts = response.Counts,
+                Results = response.Results.Where(HasContactableDetail).ToList(),
+                Pagination = response.Pagination,
+                Errors = response.Errors
+            };
+        }
+
+        return response;
+    }
+
+    private static bool HasContactableDetail(RhetorikProfileResult r)
+    {
+        var emails = r.ContactData?.ContactEmails;
+        if (emails is { Count: > 0 } && emails.Any(e => !string.IsNullOrWhiteSpace(e.Email)))
+        {
+            return true;
+        }
+
+        var phones = r.ContactData?.ContactPhones;
+        return phones is { Count: > 0 } && phones.Any(p => !string.IsNullOrWhiteSpace(p.Phone));
+    }
+
+    public async Task<int> CountProfilesAsync(ProfileSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await SearchSinglePageAsync(request, 1, 1, revealAllData: false, cancellationToken);
+        return response.Counts?.ProfilesTotalResults ?? 0;
+    }
+
+    public async Task<IReadOnlyDictionary<string, RhetorikContactEmailData>> FetchContactEmailsAsync(IReadOnlyCollection<string> profileIds, CancellationToken cancellationToken = default)
+    {
+        // Contact-email discovery uses Rhetorik's paid "reveal_all_data". Never call it unless enabled.
+        if (!_options.RevealContactEmails)
+        {
+            return new Dictionary<string, RhetorikContactEmailData>();
+        }
+
+        var ids = profileIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct()
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            return new Dictionary<string, RhetorikContactEmailData>();
+        }
+
+        var request = new ProfileSearchRequest
+        {
+            ProfileIds = ids,
+            MaxResults = ids.Count
+        };
+
+        var response = await SearchAllPagesAsync(request, revealAllData: true, cancellationToken);
+
+        return response.Results
+            .Where(r => r.ProfileData is not null && !string.IsNullOrWhiteSpace(r.ProfileData.ProfileId))
+            .ToDictionary(
+                r => r.ProfileData!.ProfileId,
+                r => new RhetorikContactEmailData(
+                    r.ContactData?.ContactEmails ?? [],
+                    r.ProfileData?.ProfileEmails ?? []));
+    }
+
+    private async Task<ProfileSearchResponse> SearchAllPagesAsync(ProfileSearchRequest request, bool revealAllData, CancellationToken cancellationToken)
     {
         var maxResults = Math.Clamp(request.MaxResults, 1, 1000);
         var pageSize = Math.Clamp(request.PageSize, 1, MaxPageSize);
@@ -37,7 +109,7 @@ public class RhetorikClient : IRhetorikClient
 
         while (allResults.Count < maxResults)
         {
-            var response = await SearchSinglePageAsync(request, pageNumber, pageSize, cancellationToken);
+            var response = await SearchSinglePageAsync(request, pageNumber, pageSize, revealAllData, cancellationToken);
             lastResponse = response;
 
             allResults.AddRange(response.Results);
@@ -64,12 +136,12 @@ public class RhetorikClient : IRhetorikClient
         };
     }
 
-    private async Task<ProfileSearchResponse> SearchSinglePageAsync(ProfileSearchRequest request, int pageNumber, int pageSize, CancellationToken cancellationToken)
+    private async Task<ProfileSearchResponse> SearchSinglePageAsync(ProfileSearchRequest request, int pageNumber, int pageSize, bool revealAllData, CancellationToken cancellationToken)
     {
         var payload = new
         {
             parameters = request.BuildParameters(),
-            reveal_all_data = RevealAllData,
+            reveal_all_data = revealAllData,
             page_size = pageSize,
             page_number = pageNumber
         };
@@ -132,7 +204,43 @@ public class RhetorikClient : IRhetorikClient
     {
         var p = r.ProfileData!;
         var currentExperience = r.ContactData?.CurrentExperiences?
-            .FirstOrDefault(e => e.Current) ?? r.ContactData?.CurrentExperiences?.FirstOrDefault();
+            .FirstOrDefault(e => e.Current == true) ?? r.ContactData?.CurrentExperiences?.FirstOrDefault();
+
+        var workExperience = r.ResumeData?.Experiences?
+            .Select(e => new { company = e.RawCompanyName ?? e.CompanyName, title = e.JobTitle, current = e.Current ?? false, startDate = e.StartDate, endDate = e.EndDate })
+            .ToList();
+
+        var education = r.ResumeData?.Educations?
+            .Select(e => new { school = e.EducationalEstablishment, degree = e.Diploma, specialization = e.Specialization, startDate = e.StartDate, endDate = e.EndDate })
+            .ToList();
+
+        var certifications = r.ResumeData?.Certifications?
+            .Select(c => c.Name)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var memberships = r.ResumeData?.Memberships?
+            .Select(m => m.Name ?? m.Title)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var publications = r.ResumeData?.Publications?
+            .Select(p => p.Name)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var awards = r.ResumeData?.Awards?
+            .Select(a => a.Name)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var patents = r.ResumeData?.Patents?
+            .Select(p => p.Name)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var languages = p.Languages?.ToList();
+        var industries = p.Tags?.Where(t => t.Contains("Industry") || t.Contains("industry")).ToList();
 
         return new Lead
         {
@@ -142,9 +250,40 @@ public class RhetorikClient : IRhetorikClient
             Email = string.Empty,
             Company = TruncateNullable(currentExperience?.RawCompanyName ?? currentExperience?.CompanyName, 200),
             JobTitle = TruncateNullable(currentExperience?.JobTitle ?? p.Headline, 200),
-            LinkedInUrl = null,
-            Source = Truncate($"Rhetorik:{ProfileSearchEndpoint}", 100)
+            Location = TruncateNullable(BuildLocation(p.Address), 200),
+            LinkedInUrl = RhetorikSocialLinks.ExtractLinkedInUrl(p.SocialLinks),
+            Source = Truncate($"Rhetorik:{ProfileSearchEndpoint}", 100),
+            Profile = new LeadProfile
+            {
+                Headline = TruncateNullable(p.Headline, 500),
+                Summary = p.Summary,
+                SelfReportedSkills = p.Expertises is { Count: > 0 } ? string.Join(", ", p.Expertises) : null,
+                WorkExperience = workExperience is { Count: > 0 } ? System.Text.Json.JsonSerializer.Serialize(workExperience) : null,
+                Education = education is { Count: > 0 } ? System.Text.Json.JsonSerializer.Serialize(education) : null,
+                Certifications = certifications is { Count: > 0 } ? string.Join(", ", certifications) : null,
+                Industries = industries is { Count: > 0 } ? string.Join(", ", industries) : null,
+                Languages = languages is { Count: > 0 } ? string.Join(", ", languages) : null,
+                Memberships = memberships is { Count: > 0 } ? string.Join(", ", memberships) : null,
+                Publications = publications is { Count: > 0 } ? string.Join(", ", publications) : null,
+                Awards = awards is { Count: > 0 } ? string.Join(", ", awards) : null,
+                Patents = patents is { Count: > 0 } ? string.Join(", ", patents) : null
+            }
         };
+    }
+
+    private static string? BuildLocation(RhetorikAddress? address)
+    {
+        if (address is null)
+        {
+            return null;
+        }
+
+        var parts = new[] { address.City, address.State, address.Country }
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .Select(part => part!.Trim())
+            .ToList();
+
+        return parts.Count == 0 ? null : string.Join(", ", parts);
     }
 
     private static string Truncate(string value, int maxLength)

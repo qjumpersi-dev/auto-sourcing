@@ -1,0 +1,585 @@
+using AutoSourcing.Core.Entities;
+using AutoSourcing.Core.Enums;
+using AutoSourcing.Data;
+using AutoSourcing.Services.Email;
+using AutoSourcing.Services.Microsoft;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace AutoSourcing.Services.Interviews;
+
+public record InterviewSlot(DateTime StartUtc, string Label);
+
+public interface IInterviewService
+{
+    // The next few times the organiser is free.
+    Task<IReadOnlyList<InterviewSlot>> GetAvailableSlotsAsync(int leadId, CancellationToken cancellationToken = default);
+
+    Task<Interview> BookAsync(int leadId, int? campaignId, int? jobId, DateTime startUtc, IReadOnlyCollection<int> panelUserIds, CancellationToken cancellationToken = default);
+
+    // Link (or change) the role an interview is for.
+    Task SetRoleAsync(int interviewId, int? jobId, CancellationToken cancellationToken = default);
+
+    Task<Interview> RescheduleAsync(int interviewId, DateTime startUtc, CancellationToken cancellationToken = default);
+
+    Task CancelAsync(int interviewId, string? reason, CancellationToken cancellationToken = default);
+
+    // Pull the Teams transcript, summarise it against the role, and save that as a note on the candidate.
+    Task<bool> ProcessTranscriptAsync(int interviewId, CancellationToken cancellationToken = default);
+
+    // Check the Teams attendance report and set Completed vs NoShow for the candidate.
+    Task<bool> CheckAttendanceAsync(int interviewId, CancellationToken cancellationToken = default);
+
+    // Email the candidate a reminder a day before the interview.
+    Task<bool> SendReminderAsync(int interviewId, CancellationToken cancellationToken = default);
+}
+
+public class InterviewService : IInterviewService
+{
+    private readonly AutoSourcingDbContext _dbContext;
+    private readonly IMicrosoftGraphService _graphService;
+    private readonly IMicrosoftTokenService _tokenService;
+    private readonly IEmailService _emailService;
+    private readonly IInterviewSummaryService _summaryService;
+    private readonly InterviewOptions _options;
+
+    public InterviewService(
+        AutoSourcingDbContext dbContext,
+        IMicrosoftGraphService graphService,
+        IMicrosoftTokenService tokenService,
+        IEmailService emailService,
+        IInterviewSummaryService summaryService,
+        IOptions<InterviewOptions> options)
+    {
+        _dbContext = dbContext;
+        _graphService = graphService;
+        _tokenService = tokenService;
+        _emailService = emailService;
+        _summaryService = summaryService;
+        _options = options.Value;
+    }
+
+    public async Task<IReadOnlyList<InterviewSlot>> GetAvailableSlotsAsync(int leadId, CancellationToken cancellationToken = default)
+    {
+        var lead = await _dbContext.Leads
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(l => l.Id == leadId, cancellationToken);
+
+        if (lead is null)
+        {
+            return [];
+        }
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == lead.UserId, cancellationToken);
+
+        if (organiser is null || string.IsNullOrWhiteSpace(organiser.MicrosoftRefreshToken))
+        {
+            return [];
+        }
+
+        var now = DateTime.UtcNow;
+        var windowStart = now.AddHours(_options.EarliestBookingHours);
+        var windowEnd = now.AddDays(_options.LatestBookingDays);
+
+        var accessToken = await _tokenService.GetAccessTokenAsync(organiser, cancellationToken);
+        var mailbox = organiser.MicrosoftAccountEmail ?? organiser.Email;
+        var busy = await _graphService.GetBusySlotsAsync(accessToken, mailbox, now, windowEnd, cancellationToken);
+
+        var timeZone = ResolveTimeZone();
+        var candidates = BuildCandidateSlots(windowStart, windowEnd, timeZone)
+            .Where(slot => !OverlapsBusy(slot, busy))
+            .ToList();
+
+        // Prefer spreading the options across different days.
+        var picked = new List<DateTime>();
+        var usedDays = new HashSet<DateTime>();
+
+        foreach (var slot in candidates)
+        {
+            var day = TimeZoneInfo.ConvertTimeFromUtc(slot, timeZone).Date;
+            if (usedDays.Add(day))
+            {
+                picked.Add(slot);
+            }
+
+            if (picked.Count >= _options.SlotCount)
+            {
+                return ToSlots(picked, timeZone);
+            }
+        }
+
+        // Not enough distinct days - fill up with same-day options.
+        foreach (var slot in candidates)
+        {
+            if (picked.Contains(slot))
+            {
+                continue;
+            }
+
+            picked.Add(slot);
+            if (picked.Count >= _options.SlotCount)
+            {
+                break;
+            }
+        }
+
+        picked.Sort();
+        return ToSlots(picked, timeZone);
+    }
+
+    private static IReadOnlyList<InterviewSlot> ToSlots(IEnumerable<DateTime> utcSlots, TimeZoneInfo timeZone) =>
+        utcSlots
+            .Select(utc =>
+            {
+                var local = TimeZoneInfo.ConvertTimeFromUtc(utc, timeZone);
+                return new InterviewSlot(utc, local.ToString("dddd d MMMM, h:mm tt", System.Globalization.CultureInfo.InvariantCulture));
+            })
+            .ToList();
+
+    public async Task<Interview> BookAsync(int leadId, int? campaignId, int? jobId, DateTime startUtc, IReadOnlyCollection<int> panelUserIds, CancellationToken cancellationToken = default)
+    {
+        var lead = await _dbContext.Leads
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(l => l.Id == leadId, cancellationToken)
+            ?? throw new InvalidOperationException("Candidate not found.");
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == lead.UserId, cancellationToken)
+            ?? throw new InvalidOperationException("Organiser not found.");
+
+        if (string.IsNullOrWhiteSpace(organiser.MicrosoftRefreshToken))
+        {
+            throw new InvalidOperationException("The organiser has not connected Microsoft 365.");
+        }
+
+        var duration = _options.DurationMinutes;
+        var endUtc = startUtc.AddMinutes(duration);
+
+        var attendees = new List<MeetingAttendee>
+        {
+            new(lead.Email, $"{lead.FirstName} {lead.LastName}".Trim())
+        };
+
+        var panel = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .Where(u => panelUserIds.Contains(u.Id))
+            .ToListAsync(cancellationToken);
+
+        foreach (var member in panel)
+        {
+            attendees.Add(new MeetingAttendee(member.Email, member.DisplayName));
+        }
+
+        var job = jobId is { } id
+            ? await _dbContext.Jobs.IgnoreQueryFilters().FirstOrDefaultAsync(j => j.Id == id, cancellationToken)
+            : null;
+
+        var title = job is null ? "Interview" : $"Interview: {job.Title}";
+        var body =
+            $"<p>Hi {lead.FirstName},</p>" +
+            $"<p>Your interview{(job is null ? string.Empty : $" for the {job.Title} role")} is confirmed for " +
+            $"{startUtc:dddd d MMMM yyyy HH:mm} UTC ({duration} minutes).</p>" +
+            "<p>Join with the Teams link in this invitation.</p>";
+
+        var accessToken = await _tokenService.GetAccessTokenAsync(organiser, cancellationToken);
+        var meeting = await _graphService.CreateOnlineMeetingAsync(accessToken, title, body, startUtc, endUtc, attendees, cancellationToken);
+
+        if (_options.EnableTranscription && !string.IsNullOrWhiteSpace(meeting.JoinUrl))
+        {
+            try
+            {
+                await _graphService.EnableTranscriptionAsync(accessToken, meeting.JoinUrl, cancellationToken);
+            }
+            catch
+            {
+                // The tenant's Teams policy may block recording; never fail the booking because of it.
+            }
+        }
+
+        var interview = new Interview
+        {
+            UserId = organiser.Id,
+            LeadId = lead.Id,
+            CampaignId = campaignId,
+            JobId = jobId,
+            StartAt = startUtc,
+            DurationMinutes = duration,
+            Status = InterviewStatus.Booked,
+            GraphEventId = meeting.EventId,
+            TeamsJoinUrl = meeting.JoinUrl
+        };
+
+        interview.Attendees.Add(new InterviewAttendee
+        {
+            UserId = organiser.Id,
+            Email = lead.Email,
+            Name = $"{lead.FirstName} {lead.LastName}".Trim(),
+            Role = InterviewAttendeeRole.Candidate
+        });
+
+        interview.Attendees.Add(new InterviewAttendee
+        {
+            UserId = organiser.Id,
+            AppUserId = organiser.Id,
+            Email = organiser.Email,
+            Name = organiser.DisplayName,
+            Role = InterviewAttendeeRole.Organiser
+        });
+
+        foreach (var member in panel)
+        {
+            interview.Attendees.Add(new InterviewAttendee
+            {
+                UserId = organiser.Id,
+                AppUserId = member.Id,
+                Email = member.Email,
+                Name = member.DisplayName,
+                Role = InterviewAttendeeRole.Panel
+            });
+        }
+
+        _dbContext.Interviews.Add(interview);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await NotifyOrganiserAsync(organiser, lead, interview, "Interview booked", cancellationToken);
+
+        return interview;
+    }
+
+    public async Task SetRoleAsync(int interviewId, int? jobId, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken)
+            ?? throw new InvalidOperationException("Interview not found.");
+
+        if (jobId is { } id)
+        {
+            var job = await _dbContext.Jobs
+                .FirstOrDefaultAsync(j => j.Id == id, cancellationToken)
+                ?? throw new InvalidOperationException("Job not found.");
+        }
+
+        interview.JobId = jobId;
+        interview.UpdatedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<Interview> RescheduleAsync(int interviewId, DateTime startUtc, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken)
+            ?? throw new InvalidOperationException("Interview not found.");
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == interview.UserId, cancellationToken)
+            ?? throw new InvalidOperationException("Organiser not found.");
+
+        if (!string.IsNullOrWhiteSpace(interview.GraphEventId))
+        {
+            var accessToken = await _tokenService.GetAccessTokenAsync(organiser, cancellationToken);
+            await _graphService.RescheduleMeetingAsync(
+                accessToken, interview.GraphEventId, startUtc, startUtc.AddMinutes(interview.DurationMinutes), cancellationToken);
+        }
+
+        interview.StartAt = startUtc;
+        interview.Status = InterviewStatus.Booked;
+        interview.UpdatedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var lead = await _dbContext.Leads.IgnoreQueryFilters().FirstOrDefaultAsync(l => l.Id == interview.LeadId, cancellationToken);
+        if (lead is not null)
+        {
+            await NotifyOrganiserAsync(organiser, lead, interview, "Interview rescheduled", cancellationToken);
+        }
+
+        return interview;
+    }
+
+    public async Task CancelAsync(int interviewId, string? reason, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken)
+            ?? throw new InvalidOperationException("Interview not found.");
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == interview.UserId, cancellationToken);
+
+        if (organiser is not null && !string.IsNullOrWhiteSpace(interview.GraphEventId))
+        {
+            var accessToken = await _tokenService.GetAccessTokenAsync(organiser, cancellationToken);
+            await _graphService.CancelMeetingAsync(accessToken, interview.GraphEventId, reason, cancellationToken);
+        }
+
+        interview.Status = InterviewStatus.Cancelled;
+        interview.UpdatedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> ProcessTranscriptAsync(int interviewId, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Include(i => i.Lead)
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken);
+
+        if (interview?.Lead is null || string.IsNullOrWhiteSpace(interview.TeamsJoinUrl))
+        {
+            return false;
+        }
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == interview.UserId, cancellationToken);
+
+        if (organiser is null || string.IsNullOrWhiteSpace(organiser.MicrosoftRefreshToken))
+        {
+            return false;
+        }
+
+        var accessToken = await _tokenService.GetAccessTokenAsync(organiser, cancellationToken);
+        var transcript = await _graphService.GetTranscriptAsync(accessToken, interview.TeamsJoinUrl, cancellationToken);
+        if (string.IsNullOrWhiteSpace(transcript))
+        {
+            return false;
+        }
+
+        interview.Transcript = transcript;
+        interview.TranscriptFetchedAt = DateTime.UtcNow;
+        interview.Status = InterviewStatus.Completed;
+        interview.UpdatedAt = DateTime.UtcNow;
+
+        var job = interview.JobId is { } jobId
+            ? await _dbContext.Jobs.IgnoreQueryFilters().FirstOrDefaultAsync(j => j.Id == jobId, cancellationToken)
+            : null;
+
+        var candidateName = $"{interview.Lead.FirstName} {interview.Lead.LastName}".Trim();
+        var insights = await _summaryService.AnalyseAsync(transcript, candidateName, job, cancellationToken);
+
+        if (insights is not null)
+        {
+            interview.Summary = insights.Html;
+            interview.SummaryGeneratedAt = DateTime.UtcNow;
+
+            // The summary becomes a note against the candidate.
+            _dbContext.ConversationMessages.Add(new ConversationMessage
+            {
+                UserId = interview.UserId,
+                LeadId = interview.LeadId,
+                Role = "interview-summary",
+                Content = insights.Html,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> CheckAttendanceAsync(int interviewId, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Include(i => i.Lead)
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken);
+
+        if (interview?.Lead is null || string.IsNullOrWhiteSpace(interview.TeamsJoinUrl))
+        {
+            return false;
+        }
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == interview.UserId, cancellationToken);
+
+        if (organiser is null || string.IsNullOrWhiteSpace(organiser.MicrosoftRefreshToken))
+        {
+            return false;
+        }
+
+        var accessToken = await _tokenService.GetAccessTokenAsync(organiser, cancellationToken);
+        var records = await _graphService.GetAttendanceAsync(accessToken, interview.TeamsJoinUrl, cancellationToken);
+
+        interview.AttendanceCheckedAt = DateTime.UtcNow;
+
+        if (records is null)
+        {
+            // Teams hasn't produced the report yet - try again later.
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return false;
+        }
+
+        var candidateEmail = interview.Lead.Email;
+        var attended = records.Any(record =>
+            !string.IsNullOrWhiteSpace(record.Email) &&
+            string.Equals(record.Email, candidateEmail, StringComparison.OrdinalIgnoreCase) &&
+            record.TotalSeconds > 0);
+
+        interview.Attended = attended;
+        interview.Status = attended ? InterviewStatus.Completed : InterviewStatus.NoShow;
+        interview.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> SendReminderAsync(int interviewId, CancellationToken cancellationToken = default)
+    {
+        var interview = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Include(i => i.Lead)
+            .FirstOrDefaultAsync(i => i.Id == interviewId, cancellationToken);
+
+        if (interview?.Lead is null || interview.ReminderSentAt is not null)
+        {
+            return false;
+        }
+
+        var organiser = await _dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == interview.UserId, cancellationToken);
+
+        if (organiser is null || string.IsNullOrWhiteSpace(interview.Lead.Email))
+        {
+            return false;
+        }
+
+        var local = TimeZoneInfo.ConvertTimeFromUtc(interview.StartAt, ResolveTimeZone());
+        var body =
+            $"<p>Hi {System.Net.WebUtility.HtmlEncode(interview.Lead.FirstName)},</p>" +
+            $"<p>This is a reminder that your interview is on <strong>{local:dddd d MMMM yyyy, h:mm tt}</strong> ({interview.DurationMinutes} minutes).</p>" +
+            (string.IsNullOrWhiteSpace(interview.TeamsJoinUrl)
+                ? string.Empty
+                : $"<p><strong>Join:</strong> <a href=\"{interview.TeamsJoinUrl}\">Join the interview</a></p>") +
+            "<p>If you need to change the time, just reply to this email.</p>";
+
+        try
+        {
+            var sender = new SenderIdentity(
+                organiser.Id,
+                organiser.SendFromAddress,
+                string.IsNullOrWhiteSpace(organiser.SendFromName) ? organiser.DisplayName : organiser.SendFromName,
+                string.IsNullOrWhiteSpace(organiser.ReplyToAddress) ? organiser.Email : organiser.ReplyToAddress);
+
+            await _emailService.SendAsync(
+                new[] { interview.Lead.Email },
+                "Reminder: your interview",
+                body,
+                headers: null,
+                cancellationToken: cancellationToken,
+                sender: sender);
+        }
+        catch
+        {
+            // Never let a failed reminder break anything.
+            return false;
+        }
+
+        interview.ReminderSentAt = DateTime.UtcNow;
+        interview.UpdatedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    // Microsoft never emails the organiser their own meeting, so we send our own confirmation.
+    private async Task NotifyOrganiserAsync(User organiser, Lead lead, Interview interview, string subject, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var local = TimeZoneInfo.ConvertTimeFromUtc(interview.StartAt, ResolveTimeZone());
+            var name = $"{lead.FirstName} {lead.LastName}".Trim();
+
+            var body =
+                $"<p><strong>{subject}</strong></p>" +
+                $"<p><strong>Candidate:</strong> {System.Net.WebUtility.HtmlEncode(name)}</p>" +
+                $"<p><strong>When:</strong> {local:dddd d MMMM yyyy, h:mm tt} ({interview.DurationMinutes} minutes)</p>" +
+                (string.IsNullOrWhiteSpace(interview.TeamsJoinUrl)
+                    ? string.Empty
+                    : $"<p><strong>Teams:</strong> <a href=\"{interview.TeamsJoinUrl}\">Join the interview</a></p>") +
+                "<p>This meeting is in your Microsoft calendar.</p>";
+
+            var sender = new SenderIdentity(
+                organiser.Id,
+                organiser.SendFromAddress,
+                string.IsNullOrWhiteSpace(organiser.SendFromName) ? organiser.DisplayName : organiser.SendFromName,
+                string.IsNullOrWhiteSpace(organiser.ReplyToAddress) ? organiser.Email : organiser.ReplyToAddress);
+
+            await _emailService.SendAsync(
+                new[] { organiser.Email },
+                $"{subject}: {name}",
+                body,
+                headers: null,
+                cancellationToken: cancellationToken,
+                sender: sender);
+        }
+        catch
+        {
+            // A notification failure must not fail the booking itself.
+        }
+    }
+
+    private IEnumerable<DateTime> BuildCandidateSlots(DateTime windowStart, DateTime windowEnd, TimeZoneInfo timeZone)
+    {
+        var localStart = TimeZoneInfo.ConvertTimeFromUtc(windowStart, timeZone);
+        var localEnd = TimeZoneInfo.ConvertTimeFromUtc(windowEnd, timeZone);
+
+        for (var day = localStart.Date; day <= localEnd.Date; day = day.AddDays(1))
+        {
+            if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                continue;
+            }
+
+            for (var minutes = _options.WorkingHourStart * 60;
+                 minutes + _options.DurationMinutes <= _options.WorkingHourEnd * 60;
+                 minutes += _options.DurationMinutes)
+            {
+                var local = DateTime.SpecifyKind(day.AddMinutes(minutes), DateTimeKind.Unspecified);
+                DateTime utc;
+                try
+                {
+                    utc = TimeZoneInfo.ConvertTimeToUtc(local, timeZone);
+                }
+                catch (ArgumentException)
+                {
+                    continue;
+                }
+
+                if (utc < windowStart || utc > windowEnd)
+                {
+                    continue;
+                }
+
+                yield return utc;
+            }
+        }
+    }
+
+    private bool OverlapsBusy(DateTime slotStart, IReadOnlyList<BusySlot> busy)
+    {
+        var slotEnd = slotStart.AddMinutes(_options.DurationMinutes);
+        return busy.Any(b => slotStart < b.EndUtc && slotEnd > b.StartUtc);
+    }
+
+    private TimeZoneInfo ResolveTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(_options.TimeZone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.Utc;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return TimeZoneInfo.Utc;
+        }
+    }
+}
