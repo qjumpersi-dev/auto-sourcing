@@ -11,9 +11,18 @@ export interface Lead {
   source: string
   externalId: string | null
   status: number
-  preferredChannel: number | null
-  country: string | null
-  createdAt: string
+    preferredChannel: number | null
+    country: string | null
+    industryTag: string | null
+    jobTitleTag: string | null
+    roleFamilyTag: string | null
+    sourceIndustry: string | null
+    payExpectation: string | null
+    availability: string | null
+    noticePeriod: string | null
+    workAuthorisation: string | null
+    licencesHeld: string | null
+    createdAt: string
   updatedAt: string | null
   campaigns?: CampaignRef[] | null
 }

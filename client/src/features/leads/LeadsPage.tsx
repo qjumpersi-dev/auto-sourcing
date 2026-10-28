@@ -4,6 +4,7 @@ import {
   useAddLeadsToCampaignMutation,
   useGetCampaignsQuery,
   useGetLeadsQuery,
+  useGetLookupsQuery,
   useUpdateLeadStatusMutation,
 } from '@/services/apiSlice'
 import { leadStatusLabels, type Lead } from '@/types/models'
@@ -25,6 +26,9 @@ type SortKey = 'name' | 'email' | 'company' | 'jobtitle' | 'status' | 'dateadded
 export function LeadsPage() {
   const [leadPage, setLeadPage] = useState(1)
   const [filterCampaignId, setFilterCampaignId] = useState('')
+  const [filterIndustry, setFilterIndustry] = useState('')
+  const [filterRoleFamily, setFilterRoleFamily] = useState('')
+  const [filterWorkAuthorisation, setFilterWorkAuthorisation] = useState('')
   const [sortBy, setSortBy] = useState<SortKey>('dateadded')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [addedFrom, setAddedFrom] = useState('')
@@ -34,6 +38,9 @@ export function LeadsPage() {
       page: leadPage,
       pageSize: PAGE_SIZE,
       campaignId: filterCampaignId ? Number(filterCampaignId) : undefined,
+      industry: filterIndustry || undefined,
+      roleFamily: filterRoleFamily || undefined,
+      workAuthorisation: filterWorkAuthorisation || undefined,
       sortBy,
       sortOrder,
       addedFrom: addedFrom || undefined,
@@ -52,6 +59,8 @@ export function LeadsPage() {
   const [updateLeadStatus] = useUpdateLeadStatusMutation()
   const [addLeadsToCampaign, { isLoading: adding }] = useAddLeadsToCampaignMutation()
   const { data: campaigns = [] } = useGetCampaignsQuery()
+  const { data: industryLookups = [] } = useGetLookupsQuery('industry')
+  const { data: roleFamilyLookups = [] } = useGetLookupsQuery('role-family')
 
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<number>>(new Set())
   const [targetCampaign, setTargetCampaign] = useState('')
@@ -176,6 +185,48 @@ export function LeadsPage() {
               setAddedTo(e.target.value)
               setLeadPage(1)
             }}
+          />
+          <Label className="text-xs text-muted-foreground">Industry</Label>
+          <Select
+            className="h-8 w-48 text-xs"
+            value={filterIndustry}
+            onChange={(e) => {
+              setFilterIndustry(e.target.value)
+              setLeadPage(1)
+            }}
+          >
+            <option value="">All industries</option>
+            {industryLookups.map((lookup) => (
+              <option key={lookup.id} value={lookup.value}>
+                {lookup.value}
+              </option>
+            ))}
+          </Select>
+          <Label className="text-xs text-muted-foreground">Role family</Label>
+          <Select
+            className="h-8 w-48 text-xs"
+            value={filterRoleFamily}
+            onChange={(e) => {
+              setFilterRoleFamily(e.target.value)
+              setLeadPage(1)
+            }}
+          >
+            <option value="">All role families</option>
+            {roleFamilyLookups.map((lookup) => (
+              <option key={lookup.id} value={lookup.value}>
+                {lookup.value}
+              </option>
+            ))}
+          </Select>
+          <Label className="text-xs text-muted-foreground">Work authorisation</Label>
+          <Input
+            className="h-8 w-48 text-xs"
+            value={filterWorkAuthorisation}
+            onChange={(e) => {
+              setFilterWorkAuthorisation(e.target.value)
+              setLeadPage(1)
+            }}
+            placeholder="e.g. citizen"
           />
         </div>
 

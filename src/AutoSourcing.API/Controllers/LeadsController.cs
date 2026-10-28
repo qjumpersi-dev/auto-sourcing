@@ -30,8 +30,17 @@ public class LeadDto
     public string? ExternalId { get; set; }
     public LeadStatus Status { get; set; }
     public ConsentChannel? PreferredChannel { get; set; }
-    public string? Country { get; set; }
-    public DateTime CreatedAt { get; set; }
+      public string? Country { get; set; }
+      public string? IndustryTag { get; set; }
+      public string? JobTitleTag { get; set; }
+      public string? RoleFamilyTag { get; set; }
+      public string? SourceIndustry { get; set; }
+      public string? PayExpectation { get; set; }
+      public string? Availability { get; set; }
+      public string? NoticePeriod { get; set; }
+      public string? WorkAuthorisation { get; set; }
+      public string? LicencesHeld { get; set; }
+      public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public List<CampaignRef> Campaigns { get; set; } = [];
     public List<LeadEmailDto> Emails { get; set; } = [];
@@ -126,9 +135,18 @@ public class UpdateLeadRequest
     public string? LinkedInUrl { get; set; }
     public string? Company { get; set; }
     public string? JobTitle { get; set; }
-    public string? Location { get; set; }
-    public string? Country { get; set; }
-}
+      public string? Location { get; set; }
+      public string? Country { get; set; }
+      public string? IndustryTag { get; set; }
+      public string? JobTitleTag { get; set; }
+      public string? RoleFamilyTag { get; set; }
+      public string? SourceIndustry { get; set; }
+      public string? PayExpectation { get; set; }
+      public string? Availability { get; set; }
+      public string? NoticePeriod { get; set; }
+      public string? WorkAuthorisation { get; set; }
+      public string? LicencesHeld { get; set; }
+  }
 
 public class RefreshLeadsRequest
 {
@@ -163,8 +181,11 @@ public class LeadsController : ControllerBase
     public async Task<ActionResult<PaginatedLeads>> GetLeads(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 100,
-        [FromQuery] int? campaignId = null,
-        [FromQuery] string? sortBy = null,
+          [FromQuery] int? campaignId = null,
+          [FromQuery] string? industry = null,
+          [FromQuery] string? roleFamily = null,
+          [FromQuery] string? workAuthorisation = null,
+          [FromQuery] string? sortBy = null,
         [FromQuery] string? sortOrder = null,
         [FromQuery] DateTime? addedFrom = null,
         [FromQuery] DateTime? addedTo = null,
@@ -184,10 +205,10 @@ public class LeadsController : ControllerBase
             query = query.Where(l => l.OutreachMessages.Any(m => m.CampaignId == campaignId.Value));
         }
 
-        if (addedFrom is not null)
-        {
-            query = query.Where(l => l.CreatedAt >= addedFrom.Value.Date);
-        }
+          if (addedFrom is not null)
+          {
+              query = query.Where(l => l.CreatedAt >= addedFrom.Value.Date);
+          }
 
         if (addedTo is not null)
         {
@@ -195,7 +216,22 @@ public class LeadsController : ControllerBase
             query = query.Where(l => l.CreatedAt < toExclusive);
         }
 
-        query = ApplySort(query, sortBy, sortOrder);
+          if (!string.IsNullOrWhiteSpace(industry))
+          {
+              query = query.Where(l => l.IndustryTag == industry);
+          }
+
+          if (!string.IsNullOrWhiteSpace(roleFamily))
+          {
+              query = query.Where(l => l.RoleFamilyTag == roleFamily);
+          }
+
+          if (!string.IsNullOrWhiteSpace(workAuthorisation))
+          {
+              query = query.Where(l => l.WorkAuthorisation == workAuthorisation);
+          }
+
+          query = ApplySort(query, sortBy, sortOrder);
 
         var totalCount = await query.CountAsync(cancellationToken);
         var leads = await query
@@ -257,8 +293,17 @@ public class LeadsController : ControllerBase
             ExternalId = l.ExternalId,
             Status = l.Status,
             PreferredChannel = l.PreferredChannel,
-            Country = l.Country,
-            CreatedAt = l.CreatedAt,
+              Country = l.Country,
+              IndustryTag = l.IndustryTag,
+              JobTitleTag = l.JobTitleTag,
+              RoleFamilyTag = l.RoleFamilyTag,
+              SourceIndustry = l.SourceIndustry,
+              PayExpectation = l.PayExpectation,
+              Availability = l.Availability,
+              NoticePeriod = l.NoticePeriod,
+              WorkAuthorisation = l.WorkAuthorisation,
+              LicencesHeld = l.LicencesHeld,
+              CreatedAt = l.CreatedAt,
             UpdatedAt = l.UpdatedAt,
             Campaigns = campaignsByLead.GetValueOrDefault(l.Id) ?? new List<CampaignRef>(),
             Emails = emailsByLead.GetValueOrDefault(l.Id) ?? new List<LeadEmailDto>(),
@@ -659,9 +704,18 @@ public class LeadsController : ControllerBase
         lead.LinkedInUrl = request.LinkedInUrl;
         lead.Company = request.Company;
         lead.JobTitle = request.JobTitle;
-        lead.Location = request.Location;
-        lead.Country = request.Country;
-        lead.UpdatedAt = DateTime.UtcNow;
+          lead.Location = request.Location;
+          lead.Country = request.Country;
+          lead.IndustryTag = request.IndustryTag;
+          lead.JobTitleTag = request.JobTitleTag;
+          lead.RoleFamilyTag = request.RoleFamilyTag;
+          lead.SourceIndustry = request.SourceIndustry;
+          lead.PayExpectation = request.PayExpectation;
+          lead.Availability = request.Availability;
+          lead.NoticePeriod = request.NoticePeriod;
+          lead.WorkAuthorisation = request.WorkAuthorisation;
+          lead.LicencesHeld = request.LicencesHeld;
+          lead.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -676,14 +730,23 @@ public class LeadsController : ControllerBase
             JobTitle = lead.JobTitle,
             Location = lead.Location,
             LinkedInUrl = lead.LinkedInUrl,
-            Country = lead.Country,
-            Source = lead.Source,
-            ExternalId = lead.ExternalId,
-            Status = lead.Status,
-            PreferredChannel = lead.PreferredChannel,
-            CreatedAt = lead.CreatedAt,
-            UpdatedAt = lead.UpdatedAt
-        });
+              Country = lead.Country,
+              IndustryTag = lead.IndustryTag,
+              JobTitleTag = lead.JobTitleTag,
+              RoleFamilyTag = lead.RoleFamilyTag,
+              SourceIndustry = lead.SourceIndustry,
+              PayExpectation = lead.PayExpectation,
+              Availability = lead.Availability,
+              NoticePeriod = lead.NoticePeriod,
+              WorkAuthorisation = lead.WorkAuthorisation,
+              LicencesHeld = lead.LicencesHeld,
+              Source = lead.Source,
+              ExternalId = lead.ExternalId,
+              Status = lead.Status,
+              PreferredChannel = lead.PreferredChannel,
+              CreatedAt = lead.CreatedAt,
+              UpdatedAt = lead.UpdatedAt
+          });
     }
 
     private static string? TruncateNullable(string? value, int maxLength)

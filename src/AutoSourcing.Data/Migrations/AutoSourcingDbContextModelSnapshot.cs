@@ -547,6 +547,9 @@ namespace AutoSourcing.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Availability")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Company")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -574,14 +577,23 @@ namespace AutoSourcing.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("IndustryTag")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("JobTitle")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("JobTitleTag")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LicencesHeld")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("LinkedInUrl")
                         .HasMaxLength(500)
@@ -591,6 +603,12 @@ namespace AutoSourcing.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("NoticePeriod")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PayExpectation")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -598,10 +616,16 @@ namespace AutoSourcing.Data.Migrations
                     b.Property<int?>("PreferredChannel")
                         .HasColumnType("int");
 
+                    b.Property<string>("RoleFamilyTag")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceIndustry")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -611,6 +635,9 @@ namespace AutoSourcing.Data.Migrations
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
+
+                    b.Property<string>("WorkAuthorisation")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 

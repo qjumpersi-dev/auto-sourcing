@@ -20,6 +20,18 @@ public class Lead : IOwnedEntity
     public LeadStatus Status { get; set; } = LeadStatus.New;
     public ConsentChannel? PreferredChannel { get; set; }
     public string? Country { get; set; }
+
+    // Talent-pool tags (curated) and the candidate's own details, kept for reuse across clients.
+    public string? IndustryTag { get; set; }
+    public string? JobTitleTag { get; set; }
+    public string? RoleFamilyTag { get; set; }
+    public string? SourceIndustry { get; set; }
+    public string? PayExpectation { get; set; }
+    public string? Availability { get; set; }
+    public string? NoticePeriod { get; set; }
+    public string? WorkAuthorisation { get; set; }
+    public string? LicencesHeld { get; set; }
+
     public Guid? ConversationKey { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
