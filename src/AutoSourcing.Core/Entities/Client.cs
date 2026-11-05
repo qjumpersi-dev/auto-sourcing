@@ -12,6 +12,14 @@ public class Client : IOwnedEntity
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }
     public string? Notes { get; set; }
+
+    // Company story the candidate agent uses when answering about the hiring client.
+    public string? About { get; set; }
+    public string? Evp { get; set; }
+    public string? Culture { get; set; }
+    public string? HiringProcess { get; set; }
+    public string? Eeo { get; set; }
+    public string? GuardRails { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 }

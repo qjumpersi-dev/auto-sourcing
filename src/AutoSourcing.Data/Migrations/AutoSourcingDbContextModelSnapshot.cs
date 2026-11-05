@@ -192,6 +192,9 @@ namespace AutoSourcing.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("About")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ContactEmail")
                         .HasColumnType("nvarchar(max)");
 
@@ -203,6 +206,21 @@ namespace AutoSourcing.Data.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Culture")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Eeo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Evp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("GuardRails")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HiringProcess")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
                         .IsRequired()

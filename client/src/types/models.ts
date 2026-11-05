@@ -521,6 +521,12 @@ export interface JobInput {
     contactEmail: string | null
     contactPhone: string | null
     notes: string | null
+    about: string | null
+    evp: string | null
+    culture: string | null
+    hiringProcess: string | null
+    eeo: string | null
+    guardRails: string | null
     createdAt: string
     updatedAt: string | null
   }
@@ -531,6 +537,12 @@ export interface JobInput {
     contactEmail?: string | null
     contactPhone?: string | null
     notes?: string | null
+    about?: string | null
+    evp?: string | null
+    culture?: string | null
+    hiringProcess?: string | null
+    eeo?: string | null
+    guardRails?: string | null
   }
 
   export interface LookupValue {

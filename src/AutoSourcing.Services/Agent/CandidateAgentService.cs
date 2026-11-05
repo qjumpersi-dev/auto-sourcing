@@ -105,6 +105,38 @@ public class CandidateAgentService : ICandidateAgentService
 
     public async Task<string> GetCompanyInfoAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default)
     {
+        // Prefer the hiring client of the candidate's job; fall back to the organisation profile.
+        if (conversationKey is { } key)
+        {
+            var lead = await ResolveLeadAsync(key, cancellationToken);
+            if (lead is not null)
+            {
+                var job = await ResolveJobForLeadAsync(lead.Id, cancellationToken);
+                if (job?.ClientId is int clientId)
+                {
+                    var client = await _dbContext.Clients
+                        .IgnoreQueryFilters()
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(c => c.Id == clientId, cancellationToken);
+
+                    if (client is not null && HasCompanyDetail(client.About, client.Evp, client.Culture, client.HiringProcess))
+                    {
+                        var name = job.AllowClientNameInMessages
+                            ? client.Name
+                            : "the hiring company (name not disclosed)";
+
+                        return $"""
+                            Company: {name}
+                            About: {StripHtml(client.About) ?? "—"}
+                            EVP / why join: {StripHtml(client.Evp) ?? "—"}
+                            Culture and benefits: {StripHtml(client.Culture) ?? "—"}
+                            Hiring process: {StripHtml(client.HiringProcess) ?? "—"}
+                            """;
+                    }
+                }
+            }
+        }
+
         var org = await ResolveOrgAsync(conversationKey, cancellationToken);
         return $"""
             Company: {org?.OrgName ?? "—"}
@@ -113,6 +145,48 @@ public class CandidateAgentService : ICandidateAgentService
             Culture and benefits: {StripHtml(org?.Culture) ?? "—"}
             Hiring process: {StripHtml(org?.HiringProcess) ?? "—"}
             """;
+    }
+
+    private static bool HasCompanyDetail(params string?[] values) =>
+        values.Any(value => !string.IsNullOrWhiteSpace(value));
+
+    private async Task<Job?> ResolveJobForLeadAsync(int leadId, CancellationToken cancellationToken)
+    {
+        var jobId = await _dbContext.Interviews
+            .IgnoreQueryFilters()
+            .Where(i => i.LeadId == leadId && i.JobId != null && i.Status != InterviewStatus.Cancelled)
+            .OrderByDescending(i => i.StartAt)
+            .Select(i => i.JobId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (jobId is null)
+        {
+            var campaignId = await _dbContext.OutreachMessages
+                .IgnoreQueryFilters()
+                .Where(m => m.LeadId == leadId)
+                .OrderByDescending(m => m.CreatedAt)
+                .Select(m => (int?)m.CampaignId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (campaignId is int cid)
+            {
+                jobId = await _dbContext.Campaigns
+                    .IgnoreQueryFilters()
+                    .Where(c => c.Id == cid)
+                    .Select(c => c.JobId)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+        }
+
+        if (jobId is not int id)
+        {
+            return null;
+        }
+
+        return await _dbContext.Jobs
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
     }
 
     public async Task<string> GetGuardrailsAsync(Guid? conversationKey = null, CancellationToken cancellationToken = default)
