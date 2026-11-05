@@ -242,10 +242,15 @@ public class McpController : ControllerBase
 
         var text = await ExecuteToolAsync(name, args, cancellationToken);
 
+        var headers = string.Join("; ", Request.Headers
+            .Where(h => !string.Equals(h.Key, "X-API-Key", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(h.Key, "Authorization", StringComparison.OrdinalIgnoreCase))
+            .Select(h => $"{h.Key}={h.Value}"));
+
         _logger.LogInformation(
-            "MCP tool {Tool} (baggage: {Baggage}) returned: {Result}",
+            "MCP tool {Tool} headers: {Headers} returned: {Result}",
             name,
-            Request.Headers["baggage"].ToString(),
+            headers,
             text.Length > 400 ? text[..400] : text);
 
         return TextResult(text);
