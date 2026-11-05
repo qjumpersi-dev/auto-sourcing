@@ -241,6 +241,13 @@ public class McpController : ControllerBase
         var args = paramsProp.TryGetProperty("arguments", out var argsProp) ? argsProp : default;
 
         var text = await ExecuteToolAsync(name, args, cancellationToken);
+
+        _logger.LogInformation(
+            "MCP tool {Tool} (baggage: {Baggage}) returned: {Result}",
+            name,
+            Request.Headers["baggage"].ToString(),
+            text.Length > 400 ? text[..400] : text);
+
         return TextResult(text);
     }
 

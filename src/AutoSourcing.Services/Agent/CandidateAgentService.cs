@@ -249,8 +249,10 @@ public class CandidateAgentService : ICandidateAgentService
                 ({ } from, { } to) => $"{from:N0} – {to:N0}"
             };
 
-        return $"""
-            Role: {job.Title}
+          return $"""
+              Role: {job.Title}
+              Status: {job.Status}
+              {(job.ExpiryDate is { } expiry ? $"Expiry: {expiry:yyyy-MM-dd}" : "Expiry: none")}
             Location: {job.Location ?? "—"}
             Department: {job.Department ?? "—"}
             Type: {job.Type} · {job.Flexibility}
