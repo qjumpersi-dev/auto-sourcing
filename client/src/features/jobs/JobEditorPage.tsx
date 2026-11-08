@@ -189,11 +189,12 @@ export function JobEditorPage({
       }
 
       if (runSearch) {
-        const criteria = await generateSearch(savedId).unwrap()
-        onRunSearch(savedId, criteria)
-      } else {
-        onSaved(savedId)
-      }
+          const criteria = await generateSearch(savedId).unwrap()
+          onRunSearch(savedId, criteria)
+        } else {
+          setSavedMessage('Saved.')
+          onSaved(savedId)
+        }
     } catch (e) {
       const data = (e as { data?: { error?: string; errors?: Record<string, string[]>; title?: string } })?.data
       const firstError = data?.errors
@@ -260,6 +261,30 @@ export function JobEditorPage({
           {savedMessage}
         </p>
       )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3">
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground">Status</Label>
+          <Select
+            className="h-8 w-40 text-xs"
+            value={String(draft.status)}
+            onChange={(e) => updateDraft({ status: Number(e.target.value) })}
+          >
+            {Object.entries(jobStatusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          {savedMessage && <span className="text-xs text-emerald-600">{savedMessage}</span>}
+          <Button type="button" onClick={() => onSave(false)} disabled={saving}>
+            {saving ? <Loader2 className="animate-spin" /> : <Save />}
+            Save
+          </Button>
+        </div>
+      </div>
 
       {step === 'basic' && (
         <Card>
