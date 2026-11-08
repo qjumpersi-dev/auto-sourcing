@@ -1,3 +1,4 @@
+using AutoSourcing.Core.Abstractions;
 using AutoSourcing.Core.Entities;
 using AutoSourcing.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -35,6 +36,8 @@ public class LookupsController : ControllerBase
             "Controls and BMS Engineer",
             "Field Service Engineer",
             "Data Centre Technician",
+            "Data Centre Operations Manager",
+            "Critical Facilities Manager",
             "Technician",
             "Engineer",
             "Other"
@@ -63,10 +66,12 @@ public class LookupsController : ControllerBase
     };
 
     private readonly AutoSourcingDbContext _dbContext;
+    private readonly ICurrentUserContext? _currentUser;
 
-    public LookupsController(AutoSourcingDbContext dbContext)
+    public LookupsController(AutoSourcingDbContext dbContext, ICurrentUserContext? currentUser = null)
     {
         _dbContext = dbContext;
+        _currentUser = currentUser;
     }
 
     [HttpGet]
@@ -85,18 +90,24 @@ public class LookupsController : ControllerBase
             .OrderBy(v => v.Value)
             .ToListAsync(cancellationToken);
 
-        if (existing.Count == 0 && Defaults.TryGetValue(key, out var defaults))
+        // Keep the predefined values present (so new defaults appear for existing users too).
+        if (Defaults.TryGetValue(key, out var defaults) && _currentUser?.UserId is int userId)
         {
-            var seeded = defaults
-                .Select(value => new LookupValue { Category = key, Value = value })
+            var present = existing.Select(v => v.Value).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var missing = defaults
+                .Where(value => !present.Contains(value))
+                .Select(value => new LookupValue { UserId = userId, Category = key, Value = value })
                 .ToList();
 
-            _dbContext.LookupValues.AddRange(seeded);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return Ok(seeded.OrderBy(v => v.Value).ToList());
+            if (missing.Count > 0)
+            {
+                _dbContext.LookupValues.AddRange(missing);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                existing.AddRange(missing);
+            }
         }
 
-        return Ok(existing);
+        return Ok(existing.OrderBy(v => v.Value).ToList());
     }
 
     [HttpPost]
@@ -118,7 +129,12 @@ public class LookupsController : ControllerBase
             return Ok(existing);
         }
 
-        var created = new LookupValue { Category = category, Value = value };
+        var created = new LookupValue
+        {
+            UserId = _currentUser?.UserId ?? 0,
+            Category = category,
+            Value = value
+        };
         _dbContext.LookupValues.Add(created);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(created);
