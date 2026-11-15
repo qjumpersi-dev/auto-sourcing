@@ -98,6 +98,18 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AutoSourcingDbContext>();
     db.Database.Migrate();
+
+    // A campaign run lives in an in-memory queue and cannot survive a restart. Clear any
+    // "running" flags left over so those campaigns can be run again.
+    var staleRuns = db.Campaigns.Where(c => c.IsRunning).ToList();
+    if (staleRuns.Count > 0)
+    {
+        foreach (var campaign in staleRuns)
+        {
+            campaign.IsRunning = false;
+        }
+        db.SaveChanges();
+    }
 }
 
 app.UseMiddleware<ApiKeyMiddleware>();
