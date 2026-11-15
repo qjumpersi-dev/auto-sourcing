@@ -4,7 +4,7 @@ public class ScottyOptions
 {
     public const string SectionName = "Scotty";
 
-    public string BaseUrl { get; set; } = "https://api.scotty-ai.com/v1";
+    public string BaseUrl { get; set; } = "https://api.eu1.scotty-ai.com/v1";
     public string ApiKey { get; set; } = string.Empty;
 
     // Recruiter-facing assistant.
