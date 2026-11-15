@@ -178,7 +178,7 @@ public class OutreachService : IOutreachService
                     emailBody,
                     _unsubscribeService.BuildHeaders(message.Lead),
                     cancellationToken,
-                    ResolveSender(message));
+                    await ResolveSenderAsync(message, cancellationToken));
                 break;
 
             case OutreachChannel.LinkedIn:
@@ -637,7 +637,7 @@ public class OutreachService : IOutreachService
         };
     }
 
-    private SenderIdentity ResolveSender(OutreachMessage message)
+    private async Task<SenderIdentity> ResolveSenderAsync(OutreachMessage message, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(message.FromAddress) ||
             !string.IsNullOrWhiteSpace(message.FromName) ||
@@ -646,6 +646,40 @@ public class OutreachService : IOutreachService
             return new SenderIdentity(message.SentByUserId, message.FromAddress, message.FromName, message.ReplyTo);
         }
 
-        return _senderProvider.Current;
+        var current = _senderProvider.Current;
+        if (current.UserId is not null)
+        {
+            return current;
+        }
+
+        // Background campaign runs have no signed-in user. Send as the user who owns the lead so
+        // the email goes through that user's Microsoft 365 connection.
+        var ownerId = message.UserId;
+        if (ownerId <= 0)
+        {
+            ownerId = await _dbContext.Leads
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(l => l.Id == message.LeadId)
+                .Select(l => l.UserId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        if (ownerId > 0)
+        {
+            var owner = await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == ownerId, cancellationToken);
+            if (owner is not null)
+            {
+                return new SenderIdentity(
+                    owner.Id,
+                    owner.SendFromAddress,
+                    string.IsNullOrWhiteSpace(owner.SendFromName) ? owner.DisplayName : owner.SendFromName,
+                    string.IsNullOrWhiteSpace(owner.ReplyToAddress) ? owner.Email : owner.ReplyToAddress);
+            }
+        }
+
+        return current;
     }
 }
