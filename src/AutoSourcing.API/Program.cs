@@ -84,6 +84,7 @@ builder.Services.AddScoped<ICandidateQualificationService, CandidateQualificatio
 
 builder.Services.AddSingleton<ICampaignRunQueue, CampaignRunQueue>();
 builder.Services.AddHostedService<CampaignRunBackgroundService>();
+builder.Services.AddHostedService<CampaignWatchdogService>();
 builder.Services.AddHostedService<InterviewTranscriptBackgroundService>();
 
 var app = builder.Build();
