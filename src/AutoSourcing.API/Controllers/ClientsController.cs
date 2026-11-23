@@ -67,6 +67,12 @@ public class ClientsController : ControllerBase
         client.ContactEmail = updated.ContactEmail;
         client.ContactPhone = updated.ContactPhone;
         client.Notes = updated.Notes;
+        client.About = updated.About;
+        client.Evp = updated.Evp;
+        client.Culture = updated.Culture;
+        client.HiringProcess = updated.HiringProcess;
+        client.Eeo = updated.Eeo;
+        client.GuardRails = updated.GuardRails;
         client.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();

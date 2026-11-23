@@ -11,9 +11,18 @@ export interface Lead {
   source: string
   externalId: string | null
   status: number
-  preferredChannel: number | null
-  country: string | null
-  createdAt: string
+    preferredChannel: number | null
+    country: string | null
+    industryTag: string | null
+    jobTitleTag: string | null
+    roleFamilyTag: string | null
+    sourceIndustry: string | null
+    payExpectation: string | null
+    availability: string | null
+    noticePeriod: string | null
+    workAuthorisation: string | null
+    licencesHeld: string | null
+    createdAt: string
   updatedAt: string | null
   campaigns?: CampaignRef[] | null
 }
@@ -512,6 +521,12 @@ export interface JobInput {
     contactEmail: string | null
     contactPhone: string | null
     notes: string | null
+    about: string | null
+    evp: string | null
+    culture: string | null
+    hiringProcess: string | null
+    eeo: string | null
+    guardRails: string | null
     createdAt: string
     updatedAt: string | null
   }
@@ -522,6 +537,12 @@ export interface JobInput {
     contactEmail?: string | null
     contactPhone?: string | null
     notes?: string | null
+    about?: string | null
+    evp?: string | null
+    culture?: string | null
+    hiringProcess?: string | null
+    eeo?: string | null
+    guardRails?: string | null
   }
 
   export interface LookupValue {
@@ -577,6 +598,28 @@ export interface JobInput {
     agentComplete: boolean
     interviewReady: boolean
     checks: QualificationCheck[]
+  }
+
+  export interface FunnelCounts {
+    identified: number
+    contacted: number
+    engaged: number
+    qualified: number
+    interviewReady: number
+    interviewScheduled: number
+    interviewHeld: number
+  }
+
+  export interface FunnelGroup {
+    key: string
+    counts: FunnelCounts
+  }
+
+  export interface TalentFunnelReport {
+    overall: FunnelCounts
+    byClient: FunnelGroup[]
+    byRoleFamily: FunnelGroup[]
+    byIndustry: FunnelGroup[]
   }
 
   export const PayPeriod = {

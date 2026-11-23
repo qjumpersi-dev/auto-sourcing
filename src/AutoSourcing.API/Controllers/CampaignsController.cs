@@ -104,6 +104,11 @@ public class CampaignsController : ControllerBase
         return NoContent();
     }
 
+    // A run lives in an in-memory queue and is lost if the API restarts. Treat an old "running"
+    // flag as stale so the campaign can be run again rather than being blocked forever.
+    private static bool IsStaleRun(Campaign campaign) =>
+        campaign.LastRunAt is null || campaign.LastRunAt.Value < DateTime.UtcNow.AddMinutes(-10);
+
     [HttpPost("{id:int}/restart")]
     public async Task<IActionResult> RestartCampaign(int id, CancellationToken cancellationToken)
     {
@@ -118,7 +123,7 @@ public class CampaignsController : ControllerBase
             return BadRequest(new { error = "Add a sequence before restarting this campaign." });
         }
 
-        if (campaign.IsRunning)
+        if (campaign.IsRunning && !IsStaleRun(campaign))
         {
             return BadRequest(new { error = "This campaign is already running." });
         }
@@ -154,7 +159,7 @@ public class CampaignsController : ControllerBase
             return BadRequest(new { error = "Add a sequence before running this campaign." });
         }
 
-        if (campaign.IsRunning)
+        if (campaign.IsRunning && !IsStaleRun(campaign))
         {
             return Ok(new { queued = false, alreadyRunning = true });
         }

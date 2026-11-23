@@ -15,6 +15,7 @@ import type {
   LookupValue,
   CandidateQualification,
   QualificationCheck,
+  TalentFunnelReport,
   EnrichedProfileSearchResponse,
   GeneratedContent,
   GenerateContentRequest,
@@ -165,8 +166,11 @@ export const apiSlice = createApi({
       {
         page: number
         pageSize: number
-        campaignId?: number
-        sortBy?: string
+          campaignId?: number
+          industry?: string
+          roleFamily?: string
+          workAuthorisation?: string
+          sortBy?: string
         sortOrder?: 'asc' | 'desc'
         addedFrom?: string
         addedTo?: string
@@ -178,7 +182,10 @@ export const apiSlice = createApi({
         const params = new URLSearchParams()
         params.set('page', String(page))
         params.set('pageSize', String(pageSize))
-        if (args?.campaignId) params.set('campaignId', String(args.campaignId))
+          if (args?.campaignId) params.set('campaignId', String(args.campaignId))
+          if (args?.industry) params.set('industry', args.industry)
+          if (args?.roleFamily) params.set('roleFamily', args.roleFamily)
+          if (args?.workAuthorisation) params.set('workAuthorisation', args.workAuthorisation)
         if (args?.sortBy) params.set('sortBy', args.sortBy)
         if (args?.sortOrder) params.set('sortOrder', args.sortOrder)
         if (args?.addedFrom) params.set('addedFrom', args.addedFrom)
@@ -220,9 +227,29 @@ export const apiSlice = createApi({
       invalidatesTags: ['Lead'],
     }),
     updateLead: builder.mutation<
-      Lead,
-      { id: number; firstName?: string; lastName?: string; email?: string; phone?: string | null; linkedInUrl?: string | null; company?: string | null; jobTitle?: string | null; location?: string | null; country?: string | null }
-    >({
+        Lead,
+        {
+          id: number
+          firstName?: string
+          lastName?: string
+          email?: string
+          phone?: string | null
+          linkedInUrl?: string | null
+          company?: string | null
+          jobTitle?: string | null
+          location?: string | null
+          country?: string | null
+          industryTag?: string | null
+          jobTitleTag?: string | null
+          roleFamilyTag?: string | null
+          sourceIndustry?: string | null
+          payExpectation?: string | null
+          availability?: string | null
+          noticePeriod?: string | null
+          workAuthorisation?: string | null
+          licencesHeld?: string | null
+        }
+      >({
       query: ({ id, ...body }) => ({ url: `/leads/${id}`, method: 'PUT', body }),
       invalidatesTags: ['Lead'],
     }),
@@ -305,6 +332,19 @@ export const apiSlice = createApi({
     }),
     getCampaignReportCandidates: builder.query<CandidateReportResponse, number>({
       query: (campaignId) => `/reports/campaign/${campaignId}/candidates`,
+    }),
+    getTalentFunnel: builder.query<
+      TalentFunnelReport,
+      { clientId?: number; roleFamily?: string; industry?: string }
+    >({
+      query: ({ clientId, roleFamily, industry }) => {
+        const params = new URLSearchParams()
+        if (clientId) params.set('clientId', String(clientId))
+        if (roleFamily) params.set('roleFamily', roleFamily)
+        if (industry) params.set('industry', industry)
+        const qs = params.toString()
+        return `/reports/talent-funnel${qs ? `?${qs}` : ''}`
+      },
     }),
     getSequences: builder.query<Sequence[], void>({
       query: () => '/sequences',
@@ -528,6 +568,7 @@ export const {
   useGetMessagesQuery,
   useGetCampaignReportQuery,
   useGetCampaignReportCandidatesQuery,
+  useGetTalentFunnelQuery,
   useCreateDraftMutation,
   useSendMessageMutation,
   useUpdateCampaignMutation,

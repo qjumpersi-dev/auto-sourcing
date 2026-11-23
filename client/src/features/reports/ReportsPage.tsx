@@ -6,7 +6,10 @@ import {
   useGetCampaignsQuery,
   useGetClientsQuery,
   useGetJobsQuery,
+  useGetLookupsQuery,
+  useGetTalentFunnelQuery,
 } from '@/services/apiSlice'
+import type { FunnelCounts, FunnelGroup } from '@/types/models'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +18,58 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate } from '@/lib/formatDate'
 
+const FUNNEL_STAGES: { key: keyof FunnelCounts; label: string }[] = [
+  { key: 'identified', label: 'Identified' },
+  { key: 'contacted', label: 'Contacted' },
+  { key: 'engaged', label: 'Engaged' },
+  { key: 'qualified', label: 'Qualified' },
+  { key: 'interviewReady', label: 'Interview ready' },
+  { key: 'interviewScheduled', label: 'Interview scheduled' },
+  { key: 'interviewHeld', label: 'Interview held' },
+]
+
+function FunnelOverall({ counts }: { counts: FunnelCounts }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-4 lg:grid-cols-7">
+      {FUNNEL_STAGES.map((stage) => (
+        <div key={stage.key} className="rounded-md border p-3">
+          <p className="text-2xl font-semibold leading-none">{counts[stage.key]}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{stage.label}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function FunnelGroupTable({ groups, keyLabel }: { groups: FunnelGroup[]; keyLabel: string }) {
+  if (groups.length === 0) {
+    return <p className="text-sm text-muted-foreground">No data.</p>
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{keyLabel}</TableHead>
+          {FUNNEL_STAGES.map((stage) => (
+            <TableHead key={stage.key}>{stage.label}</TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {groups.map((group) => (
+          <TableRow key={group.key}>
+            <TableCell className="font-medium">{group.key}</TableCell>
+            {FUNNEL_STAGES.map((stage) => (
+              <TableCell key={stage.key}>{group.counts[stage.key]}</TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  )
+}
+
 export function ReportsPage() {
   const { data: campaigns = [] } = useGetCampaignsQuery()
   const { data: jobs = [] } = useGetJobsQuery()
@@ -22,6 +77,17 @@ export function ReportsPage() {
   const [clientFilter, setClientFilter] = useState<string>('')
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('')
   const [reportCampaignId, setReportCampaignId] = useState<number | null>(null)
+  const [funnelClientId, setFunnelClientId] = useState<string>('')
+  const [funnelRoleFamily, setFunnelRoleFamily] = useState<string>('')
+  const [funnelIndustry, setFunnelIndustry] = useState<string>('')
+
+  const { data: roleFamilyLookups = [] } = useGetLookupsQuery('role-family')
+  const { data: industryLookups = [] } = useGetLookupsQuery('industry')
+  const { data: funnel, isFetching: funnelLoading } = useGetTalentFunnelQuery({
+    clientId: funnelClientId ? Number(funnelClientId) : undefined,
+    roleFamily: funnelRoleFamily || undefined,
+    industry: funnelIndustry || undefined,
+  })
 
   const {
     data: summary,
@@ -121,6 +187,89 @@ export function ReportsPage() {
             </p>
           )}
           {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Talent funnel</CardTitle>
+          <CardDescription>
+            Candidates by funnel stage, grouped by client, role family and industry. The filters
+            apply to all three tables.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Client</Label>
+              <Select
+                className="w-56"
+                value={funnelClientId}
+                onChange={(e) => setFunnelClientId(e.target.value)}
+              >
+                <option value="">All clients</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Role family</Label>
+              <Select
+                className="w-56"
+                value={funnelRoleFamily}
+                onChange={(e) => setFunnelRoleFamily(e.target.value)}
+              >
+                <option value="">All role families</option>
+                {roleFamilyLookups.map((lookup) => (
+                  <option key={lookup.id} value={lookup.value}>
+                    {lookup.value}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Industry</Label>
+              <Select
+                className="w-56"
+                value={funnelIndustry}
+                onChange={(e) => setFunnelIndustry(e.target.value)}
+              >
+                <option value="">All industries</option>
+                {industryLookups.map((lookup) => (
+                  <option key={lookup.id} value={lookup.value}>
+                    {lookup.value}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          {funnelLoading ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="animate-spin" /> Loading funnel...
+            </p>
+          ) : funnel ? (
+            <>
+              <FunnelOverall counts={funnel.overall} />
+              <div>
+                <p className="mb-2 text-sm font-medium">By client</p>
+                <FunnelGroupTable groups={funnel.byClient} keyLabel="Client" />
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-medium">By role family</p>
+                <FunnelGroupTable groups={funnel.byRoleFamily} keyLabel="Role family" />
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-medium">By industry</p>
+                <FunnelGroupTable groups={funnel.byIndustry} keyLabel="Industry" />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">No funnel data yet.</p>
+          )}
         </CardContent>
       </Card>
 

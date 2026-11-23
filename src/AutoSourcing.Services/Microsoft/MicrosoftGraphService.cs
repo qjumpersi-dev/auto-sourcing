@@ -61,7 +61,7 @@ public class MicrosoftGraphService : IMicrosoftGraphService
             ["response_mode"] = "query",
             ["scope"] = string.Join(' ', MicrosoftOptions.Scopes),
             ["state"] = state,
-            ["prompt"] = "consent"
+            ["prompt"] = "select_account"
         };
 
         var queryString = string.Join('&', query.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));

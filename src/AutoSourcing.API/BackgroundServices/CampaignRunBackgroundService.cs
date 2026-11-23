@@ -26,7 +26,12 @@ public class CampaignRunBackgroundService : BackgroundService
             {
                 using var scope = _scopeFactory.CreateScope();
                 var outreachService = scope.ServiceProvider.GetRequiredService<IOutreachService>();
-                var result = await outreachService.RunCampaignAsync(campaignId, stoppingToken);
+
+                // Never let a single stuck run block the queue forever.
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                timeout.CancelAfter(TimeSpan.FromMinutes(10));
+
+                var result = await outreachService.RunCampaignAsync(campaignId, timeout.Token);
 
                 _logger.LogInformation(
                     "Campaign {CampaignId} run finished: sent {Sent}, failed {Failed}, skipped {Skipped}, advanced {Advanced}",

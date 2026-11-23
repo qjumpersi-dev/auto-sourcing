@@ -47,20 +47,28 @@ public class EmailDispatcher : IEmailService
         if (sender?.UserId is int userId)
         {
             var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
-            if (user is not null && !string.IsNullOrWhiteSpace(user.MicrosoftRefreshToken))
+            if (user is null)
             {
-                var accessToken = await _tokenService.GetAccessTokenAsync(user, cancellationToken);
-
-                foreach (var recipient in recipients)
-                {
-                    await _graphService.SendMailAsync(
-                        accessToken,
-                        new MicrosoftSendMail(recipient, subject, body, sender.ReplyTo, sender.FromAddress, sender.FromName),
-                        cancellationToken);
-                }
-
-                return;
+                throw new InvalidOperationException($"The sending user ({userId}) could not be found.");
             }
+
+            if (string.IsNullOrWhiteSpace(user.MicrosoftRefreshToken))
+            {
+                throw new InvalidOperationException(
+                    $"Microsoft 365 is not connected for {user.Email}. Connect it in Account settings before sending email.");
+            }
+
+            var accessToken = await _tokenService.GetAccessTokenAsync(user, cancellationToken);
+
+            foreach (var recipient in recipients)
+            {
+                await _graphService.SendMailAsync(
+                    accessToken,
+                    new MicrosoftSendMail(recipient, subject, body, sender.ReplyTo, sender.FromAddress, sender.FromName),
+                    cancellationToken);
+            }
+
+            return;
         }
 
         await _smtpMailSender.SendAsync(recipients, subject, body, headers, cancellationToken, sender);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Eye, Loader2, Plus, Save, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowLeft, Eye, Loader2, MessageSquarePlus, Plus, Save, Sparkles, Trash2 } from 'lucide-react'
 import {
   useCreateSequenceMutation,
   useGetJobsQuery,
@@ -140,6 +140,7 @@ export function SequenceEditorPage({
         { label: 'Organization name', token: '{{OrgName}}' },
         { label: 'Job location', token: '{{Location}}' },
         { label: 'Consent link', token: '{{ConsentUrl}}' },
+        { label: 'Qualification chat link', token: '{{ChatUrl}}' },
         { label: 'Lead company (candidate)', token: '{{LeadCompany}}' },
         { label: 'Lead location (candidate)', token: '{{LeadLocation}}' },
       ],
@@ -164,6 +165,40 @@ export function SequenceEditorPage({
       steps: current.steps.map((item, i) => (i === index ? { ...item, ...patch } : item)),
     }))
     setSavedMessage(null)
+  }
+
+  const applyInviteTemplate = () => {
+    const channel = step?.channel
+
+    if (channel === OutreachChannel.Sms) {
+      updateStep(selectedStep, {
+        name: 'Qualification invite',
+        subjectTemplate: '',
+        bodyTemplate:
+          'Hi {{FirstName}}, a couple of quick questions about the role so we can move you forward? Chat with us here: {{ChatUrl}}',
+      })
+      return
+    }
+
+    if (channel === OutreachChannel.LinkedIn) {
+      updateStep(selectedStep, {
+        name: 'Qualification invite',
+        subjectTemplate: 'A few quick questions about the {{JobTitle}} role',
+        bodyTemplate:
+          'Hi {{FirstName}}, a few quick questions about the role so we can move you forward to an interview. You can chat with our assistant here: {{ChatUrl}}',
+      })
+      return
+    }
+
+    updateStep(selectedStep, {
+      name: 'Qualification invite',
+      subjectTemplate: 'A few quick questions about the {{JobTitle}} role',
+      bodyTemplate:
+        '<p>Hi {{FirstName}},</p>' +
+        '<p>Thanks for your interest in the role. I would like to ask a few quick questions so we can move you forward to an interview.</p>' +
+        '<p>You can chat with our assistant here: <a href="{{ChatUrl}}">{{ChatUrl}}</a></p>' +
+        '<p>It only takes a couple of minutes.</p>',
+    })
   }
 
   const addStep = () => {
@@ -457,6 +492,18 @@ export function SequenceEditorPage({
                     )}
                   </div>
                 )}
+
+                <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3">
+                  <MessageSquarePlus className="h-4 w-4" />
+                  <span className="text-sm font-medium">Invite to qualification chat</span>
+                  <Button type="button" size="sm" variant="outline" onClick={applyInviteTemplate}>
+                    Use invite template
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Fills this step with a message that links the candidate to their chat assistant
+                    ({"{{ChatUrl}}"}).
+                  </span>
+                </div>
 
                 <div className="rounded-md border bg-primary/5 p-3">
                   <div className="flex flex-wrap items-center gap-2">

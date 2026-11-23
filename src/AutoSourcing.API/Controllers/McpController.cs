@@ -241,6 +241,18 @@ public class McpController : ControllerBase
         var args = paramsProp.TryGetProperty("arguments", out var argsProp) ? argsProp : default;
 
         var text = await ExecuteToolAsync(name, args, cancellationToken);
+
+        var headers = string.Join("; ", Request.Headers
+            .Where(h => !string.Equals(h.Key, "X-API-Key", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(h.Key, "Authorization", StringComparison.OrdinalIgnoreCase))
+            .Select(h => $"{h.Key}={h.Value}"));
+
+        _logger.LogInformation(
+            "MCP tool {Tool} headers: {Headers} returned: {Result}",
+            name,
+            headers,
+            text.Length > 400 ? text[..400] : text);
+
         return TextResult(text);
     }
 

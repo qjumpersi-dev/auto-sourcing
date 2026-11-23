@@ -5,6 +5,7 @@ import type { Lead } from '@/types/models'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LookupField } from '@/components/LookupField'
 
 interface EditDraft {
   firstName: string
@@ -16,6 +17,15 @@ interface EditDraft {
   jobTitle: string
   location: string
   country: string
+  industryTag: string
+  jobTitleTag: string
+  roleFamilyTag: string
+  sourceIndustry: string
+  payExpectation: string
+  availability: string
+  noticePeriod: string
+  workAuthorisation: string
+  licencesHeld: string
 }
 
 export function LeadEditModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
@@ -30,6 +40,15 @@ export function LeadEditModal({ lead, onClose }: { lead: Lead; onClose: () => vo
     jobTitle: lead.jobTitle ?? '',
     location: lead.location ?? '',
     country: lead.country ?? '',
+    industryTag: lead.industryTag ?? '',
+    jobTitleTag: lead.jobTitleTag ?? '',
+    roleFamilyTag: lead.roleFamilyTag ?? '',
+    sourceIndustry: lead.sourceIndustry ?? '',
+    payExpectation: lead.payExpectation ?? '',
+    availability: lead.availability ?? '',
+    noticePeriod: lead.noticePeriod ?? '',
+    workAuthorisation: lead.workAuthorisation ?? '',
+    licencesHeld: lead.licencesHeld ?? '',
   })
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -54,6 +73,15 @@ export function LeadEditModal({ lead, onClose }: { lead: Lead; onClose: () => vo
         jobTitle: draft.jobTitle || null,
         location: draft.location || null,
         country: draft.country || null,
+        industryTag: draft.industryTag || null,
+        jobTitleTag: draft.jobTitleTag || null,
+        roleFamilyTag: draft.roleFamilyTag || null,
+        sourceIndustry: draft.sourceIndustry || null,
+        payExpectation: draft.payExpectation || null,
+        availability: draft.availability || null,
+        noticePeriod: draft.noticePeriod || null,
+        workAuthorisation: draft.workAuthorisation || null,
+        licencesHeld: draft.licencesHeld || null,
       }).unwrap()
       setSaved(true)
     } catch {
@@ -63,7 +91,7 @@ export function LeadEditModal({ lead, onClose }: { lead: Lead; onClose: () => vo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-lg rounded-lg border bg-white p-6 shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold">Edit contact details</h3>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
@@ -146,6 +174,91 @@ export function LeadEditModal({ lead, onClose }: { lead: Lead; onClose: () => vo
               <Input
                 value={draft.country}
                 onChange={(e) => update({ country: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-md border p-3">
+            <p className="text-sm font-medium">Talent pool tags</p>
+            <div className="space-y-1.5">
+              <Label>Industry tag</Label>
+              <LookupField
+                category="industry"
+                value={draft.industryTag}
+                onChange={(value) => update({ industryTag: value })}
+                placeholder="Select or add an industry"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Role family tag</Label>
+              <LookupField
+                category="role-family"
+                value={draft.roleFamilyTag}
+                onChange={(value) => update({ roleFamilyTag: value })}
+                placeholder="Select or add a role family"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Job title tag</Label>
+              <LookupField
+                category="job-title"
+                value={draft.jobTitleTag}
+                onChange={(value) => update({ jobTitleTag: value })}
+                placeholder="Select or add a job title"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Source industry (where they work now)</Label>
+              <Input
+                value={draft.sourceIndustry}
+                onChange={(e) => update({ sourceIndustry: e.target.value })}
+                placeholder="e.g. Telecommunications"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-md border p-3">
+            <p className="text-sm font-medium">Candidate details for reuse</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Pay expectation</Label>
+                <Input
+                  value={draft.payExpectation}
+                  onChange={(e) => update({ payExpectation: e.target.value })}
+                  placeholder="e.g. USD 95,000"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Availability</Label>
+                <Input
+                  value={draft.availability}
+                  onChange={(e) => update({ availability: e.target.value })}
+                  placeholder="e.g. immediately"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notice period</Label>
+                <Input
+                  value={draft.noticePeriod}
+                  onChange={(e) => update({ noticePeriod: e.target.value })}
+                  placeholder="e.g. 4 weeks"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Work authorisation</Label>
+                <Input
+                  value={draft.workAuthorisation}
+                  onChange={(e) => update({ workAuthorisation: e.target.value })}
+                  placeholder="e.g. citizen / visa / needs sponsorship"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Licences held</Label>
+              <Input
+                value={draft.licencesHeld}
+                onChange={(e) => update({ licencesHeld: e.target.value })}
+                placeholder="e.g. state electrical licence"
               />
             </div>
           </div>

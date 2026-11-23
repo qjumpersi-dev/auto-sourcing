@@ -20,6 +20,12 @@ interface ClientDraft {
   contactEmail: string
   contactPhone: string
   notes: string
+  about: string
+  evp: string
+  culture: string
+  hiringProcess: string
+  eeo: string
+  guardRails: string
 }
 
 const emptyDraft: ClientDraft = {
@@ -28,6 +34,12 @@ const emptyDraft: ClientDraft = {
   contactEmail: '',
   contactPhone: '',
   notes: '',
+  about: '',
+  evp: '',
+  culture: '',
+  hiringProcess: '',
+  eeo: '',
+  guardRails: '',
 }
 
 export function ClientsPage() {
@@ -68,6 +80,12 @@ export function ClientsPage() {
       contactEmail: draft.contactEmail || null,
       contactPhone: draft.contactPhone || null,
       notes: draft.notes || null,
+      about: draft.about || null,
+      evp: draft.evp || null,
+      culture: draft.culture || null,
+      hiringProcess: draft.hiringProcess || null,
+      eeo: draft.eeo || null,
+      guardRails: draft.guardRails || null,
     }
 
     try {
@@ -93,6 +111,12 @@ export function ClientsPage() {
       contactEmail: client.contactEmail ?? '',
       contactPhone: client.contactPhone ?? '',
       notes: client.notes ?? '',
+      about: client.about ?? '',
+      evp: client.evp ?? '',
+      culture: client.culture ?? '',
+      hiringProcess: client.hiringProcess ?? '',
+      eeo: client.eeo ?? '',
+      guardRails: client.guardRails ?? '',
     })
     setSaved(null)
     setError(null)
@@ -176,6 +200,68 @@ export function ClientsPage() {
                 placeholder="Anything useful about this client..."
                 rows={2}
               />
+            </div>
+
+            <div className="space-y-3 rounded-md border p-3 sm:col-span-2">
+              <p className="text-sm font-medium">Company details (used by the candidate agent)</p>
+              <p className="text-xs text-muted-foreground">
+                When a candidate asks about the company, the agent answers from these fields for the
+                job's client — falling back to your Organisation profile if they are blank.
+              </p>
+              <div className="space-y-1.5">
+                <Label>About the company</Label>
+                <Textarea
+                  value={draft.about}
+                  onChange={(e) => updateField('about', e.target.value)}
+                  rows={3}
+                  placeholder="What the client does..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>EVP / why join</Label>
+                <Textarea
+                  value={draft.evp}
+                  onChange={(e) => updateField('evp', e.target.value)}
+                  rows={2}
+                  placeholder="Why candidates should want to work there..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Culture and benefits</Label>
+                <Textarea
+                  value={draft.culture}
+                  onChange={(e) => updateField('culture', e.target.value)}
+                  rows={2}
+                  placeholder="Culture, benefits, working environment..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Hiring process</Label>
+                <Textarea
+                  value={draft.hiringProcess}
+                  onChange={(e) => updateField('hiringProcess', e.target.value)}
+                  rows={2}
+                  placeholder="Stages and timelines..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>EEO / community</Label>
+                <Textarea
+                  value={draft.eeo}
+                  onChange={(e) => updateField('eeo', e.target.value)}
+                  rows={2}
+                  placeholder="Equal employment opportunity, diversity, community..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Guard rails</Label>
+                <Textarea
+                  value={draft.guardRails}
+                  onChange={(e) => updateField('guardRails', e.target.value)}
+                  rows={2}
+                  placeholder="Topics the agent must hand to a recruiter for this client..."
+                />
+              </div>
             </div>
 
             <div className="sm:col-span-2">

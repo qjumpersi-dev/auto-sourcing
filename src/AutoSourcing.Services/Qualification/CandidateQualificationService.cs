@@ -73,6 +73,8 @@ public class CandidateQualificationService : ICandidateQualificationService
                 qualification.Checks.Add(NewCheck(lead.UserId, item));
             }
 
+            ApplyJobTags(lead, job);
+
             _dbContext.CandidateQualifications.Add(qualification);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return qualification;
@@ -88,6 +90,11 @@ public class CandidateQualificationService : ICandidateQualificationService
                 qualification.Checks.Add(NewCheck(qualification.UserId, item));
                 added = true;
             }
+        }
+
+        if (ApplyJobTags(lead, job))
+        {
+            added = true;
         }
 
         if (campaignId is int campaign && qualification.CampaignId is null)
@@ -115,6 +122,8 @@ public class CandidateQualificationService : ICandidateQualificationService
     {
         var check = await _dbContext.QualificationChecks
             .IgnoreQueryFilters()
+            .Include(c => c.Qualification)
+                .ThenInclude(q => q.Lead)
             .FirstOrDefaultAsync(c => c.Id == checkId, cancellationToken)
             ?? throw new InvalidOperationException("Check not found.");
 
@@ -123,6 +132,27 @@ public class CandidateQualificationService : ICandidateQualificationService
         check.Notes = notes;
         check.Source = source;
         check.UpdatedAt = DateTime.UtcNow;
+
+        // Keep the reusable candidate details on the lead up to date.
+        var lead = check.Qualification?.Lead;
+        if (lead is not null && !string.IsNullOrWhiteSpace(answer))
+        {
+            switch (check.Criterion)
+            {
+                case InterviewReadyCriterion.Pay:
+                    lead.PayExpectation = answer;
+                    break;
+                case InterviewReadyCriterion.WorkAuthorisation:
+                    lead.WorkAuthorisation = answer;
+                    break;
+                case InterviewReadyCriterion.Licences:
+                    lead.LicencesHeld = answer;
+                    break;
+            }
+
+            lead.UpdatedAt = DateTime.UtcNow;
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
         return check;
     }
@@ -172,6 +202,18 @@ public class CandidateQualificationService : ICandidateQualificationService
         qualification.Availability = availability;
         qualification.NoticePeriod = noticePeriod;
         qualification.UpdatedAt = DateTime.UtcNow;
+
+        var lead = await _dbContext.Leads
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(l => l.Id == qualification.LeadId, cancellationToken);
+        if (lead is not null)
+        {
+            lead.PayExpectation = payExpectation;
+            lead.Availability = availability;
+            lead.NoticePeriod = noticePeriod;
+            lead.UpdatedAt = DateTime.UtcNow;
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
         return qualification;
     }
@@ -228,6 +270,39 @@ public class CandidateQualificationService : ICandidateQualificationService
         qualification.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return qualification;
+    }
+
+    // Populate the candidate's talent-pool tags from the job, unless already set.
+    private static bool ApplyJobTags(Lead lead, Job? job)
+    {
+        if (job is null)
+        {
+            return false;
+        }
+
+        var changed = false;
+        if (string.IsNullOrWhiteSpace(lead.IndustryTag) && !string.IsNullOrWhiteSpace(job.Industry))
+        {
+            lead.IndustryTag = job.Industry;
+            changed = true;
+        }
+        if (string.IsNullOrWhiteSpace(lead.RoleFamilyTag) && !string.IsNullOrWhiteSpace(job.RoleFamily))
+        {
+            lead.RoleFamilyTag = job.RoleFamily;
+            changed = true;
+        }
+        if (string.IsNullOrWhiteSpace(lead.JobTitleTag) && !string.IsNullOrWhiteSpace(job.Title))
+        {
+            lead.JobTitleTag = job.Title;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            lead.UpdatedAt = DateTime.UtcNow;
+        }
+
+        return changed;
     }
 
     private static QualificationCheck NewCheck(int userId, InterviewReadyCheckTemplate item) => new()
